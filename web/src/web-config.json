@@ -1,8 +1,8 @@
 {
-	"name": "Template Website",
-	"title": "Template Website",
-	"description": "A template to build website",
-	"canonicalURL": "https://localhost",
+	"name": "rocketh playground",
+	"title": "rocketh playground",
+	"description": "Edit, compile and run rocketh deploy scripts in your browser, against an EVM in the tab.",
+	"canonicalURL": "https://play.rocketh.dev",
 	"ENSName": null,
 	"themeColor": "#000000",
 	"appleStatusBarStyle": "black-translucent",

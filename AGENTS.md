@@ -27,3 +27,14 @@ The second of these is checked by `web/test/svelte-conventions-boundary.test.ts`
 ## For descendants of this template
 
 This repo is the root of a template tree; other repos derive from it through a `stem` git remote and inherit `web/src/lib/core` wholesale, in several cases byte-identical. A change that is meaningful for a sibling belongs HERE rather than in the descendant that discovered it, or every sibling silently misses it. The two boundary tests above are stated at this level for the same reason: a rule inherited by every descendant is worth more than the same rule re-derived in each of them.
+
+# rocketh playground (this repository)
+
+This repository is the rocketh playground, made from `template-svelte-shadcn` (the `stem` remote). Its design is the spec `work/specs/proposed/rocketh-playground.md` in the rocketh repository (https://github.com/wighawag/rocketh); read it before changing anything here, and check it against the rocketh, webevm and template-commit-reveal code it cites rather than trusting it.
+
+- **Generic changes go to the template first.** A fix or feature that is not specific to the playground is a pull request on `template-svelte-shadcn` (or higher), then comes down through `stem`. Deleting a template file is recorded in `.offshoot-omissions` with its reason.
+- **It runs PUBLISHED rocketh packages**, pinned in `package.json`, never a rocketh checkout: the project a reader exports pins published versions, and the playground must run the same ones.
+- **User code never runs on the page's thread.** Deploy scripts run in a worker; the page renders. See the spec's security boundary.
+- **The project a reader exports is MIT** (it comes from the `hardhat-deploy init` template); only this repository's own code is AGPL-3.0.
+- **This repository is public.** No file, pull request or commit message names a funder, a grant, a milestone or a report; describe a change by what it does for a user. Never write em dashes; do not hard-wrap Markdown prose.
+- **Never send a transaction**, and stop any server you start.
