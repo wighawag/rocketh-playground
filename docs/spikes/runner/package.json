@@ -1,0 +1,35 @@
+{
+	"name": "spike-runner",
+	"private": true,
+	"license": "AGPL-3.0-only",
+	"type": "module",
+	"scripts": {
+		"prepare-inputs": "node scripts/fetch-template.mjs && node scripts/fetch-solc.mjs",
+		"check": "tsc -p .",
+		"build": "pnpm prepare-inputs && vite build",
+		"preview": "vite preview",
+		"measure": "node measure.mjs"
+	},
+	"dependencies": {
+		"@eip-1193/over-port": "0.2.1",
+		"@rocketh/core": "0.26.1",
+		"@rocketh/deploy": "0.22.5",
+		"@rocketh/diamond": "0.20.5",
+		"@rocketh/playground": "0.1.7",
+		"@rocketh/proxy": "0.21.6",
+		"@rocketh/read-execute": "0.23.1",
+		"@rocketh/signer": "0.20.4",
+		"@rocketh/unknown-signer": "0.20.3",
+		"@rocketh/viem": "0.20.5",
+		"@rocketh/web": "0.19.33",
+		"comlink": "4.4.2",
+		"rocketh": "0.26.4",
+		"typescript": "6.0.3",
+		"viem": "2.58.0",
+		"webevm": "0.9.1"
+	},
+	"devDependencies": {
+		"playwright": "1.62.1",
+		"vite": "8.3.8"
+	}
+}

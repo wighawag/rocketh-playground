@@ -1,0 +1,10 @@
+# Its own pnpm root, so the spike's dependencies stay out of the web/ workspace.
+packages: []
+# esbuild (vite's, and tsx's through @rocketh/web) only checks its platform binary;
+# @parcel/watcher comes in through tsx and is not used.
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+minimumReleaseAgeExclude:
+  - '@rocketh/unknown-signer@0.20.3'
+  - rocketh@0.26.4

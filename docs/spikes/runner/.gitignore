@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# fetched by scripts/, never committed: the compiler (9 MB, GPL-3.0) and the template files
+public/solc/
+template/
+src/solc-version.json

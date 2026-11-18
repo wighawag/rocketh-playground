@@ -1,0 +1,340 @@
+{
+  "bundles": {
+    "compiler.worker": {
+      "raw": 534,
+      "gzip": 312
+    },
+    "evm.worker": {
+      "raw": 485091,
+      "gzip": 141508
+    },
+    "page": {
+      "raw": 93921,
+      "gzip": 32668
+    },
+    "native": {
+      "raw": 308,
+      "gzip": 174
+    },
+    "runner.worker": {
+      "raw": 2570610,
+      "gzip": 477441
+    },
+    "typescript.worker": {
+      "raw": 3541575,
+      "gzip": 987734
+    },
+    "soljson-v0.8.28+commit.7893614a.js": {
+      "raw": 9169169,
+      "gzip": 6520026
+    }
+  },
+  "runs": {
+    "coldBoot": {
+      "typescriptReadyAt": 250.40000009536743,
+      "chainBoot": 107.5,
+      "compilerLoad": 437.5,
+      "compilerReadyAt": 447.2999999523163,
+      "runnerBoot": 187,
+      "readyAt": 545,
+      "wallToReadyMs": 592
+    },
+    "coldDeploy": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 73.5,
+        "transpile": 29.600000143051147,
+        "transpileInWorker": 29.199999809265137,
+        "run": 18.399999856948853,
+        "total": 123.89999985694885,
+        "toCounterRecord": 123.5
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 2,
+        "eth_getTransactionCount": 1,
+        "eth_estimateGas": 1,
+        "eth_sendRawTransaction": 1,
+        "eth_getTransactionByHash": 1,
+        "eth_getTransactionReceipt": 1
+      },
+      "deployments": {
+        "Counter": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+      }
+    },
+    "secondDeploy": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 15.5,
+        "transpile": 7.599999904632568,
+        "transpileInWorker": 7.299999952316284,
+        "run": 1.9000000953674316,
+        "total": 25.700000047683716
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 1
+      },
+      "deployments": {
+        "Counter": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+      }
+    },
+    "editedDeploy": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 13.899999856948853,
+        "transpile": 7.6000001430511475,
+        "transpileInWorker": 7.199999809265137,
+        "run": 5.3999998569488525,
+        "total": 27.399999856948853,
+        "toCounterRecord": 27.09999990463257
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 2,
+        "eth_getTransactionCount": 1,
+        "eth_estimateGas": 1,
+        "eth_sendRawTransaction": 1,
+        "eth_getTransactionByHash": 1,
+        "eth_getTransactionReceipt": 1
+      },
+      "deployments": {
+        "Counter": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
+      }
+    },
+    "reloadBoot": {
+      "compilerLoad": 154.39999985694885,
+      "compilerReadyAt": 162.90000009536743,
+      "typescriptReadyAt": 174.29999995231628,
+      "chainBoot": 101.40000009536743,
+      "runnerBoot": 157.79999995231628,
+      "readyAt": 433.5
+    },
+    "deployAfterReload": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 70.29999995231628,
+        "transpile": 32.09999990463257,
+        "transpileInWorker": 31.600000143051147,
+        "run": 8.400000095367432,
+        "total": 111.20000004768372
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 1
+      },
+      "deployments": {
+        "Counter": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
+      }
+    },
+    "stopMs": 158.59999990463257,
+    "loopedDeploy": {
+      "ok": false,
+      "stage": "stopped",
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 15.299999952316284,
+        "transpile": 10,
+        "transpileInWorker": 9.799999952316284,
+        "run": 6.400000095367432,
+        "total": 32.200000047683716
+      }
+    },
+    "deployAfterStop": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 13.400000095367432,
+        "transpile": 9.599999904632568,
+        "transpileInWorker": 9.200000047683716,
+        "run": 6.700000047683716,
+        "total": 30.299999952316284
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 1
+      },
+      "deployments": {
+        "Counter": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
+      }
+    },
+    "warmBoot": {
+      "typescriptReadyAt": 75,
+      "chainBoot": 36.200000047683716,
+      "compilerLoad": 156.69999980926514,
+      "compilerReadyAt": 165.40000009536743,
+      "runnerBoot": 78.40000009536743,
+      "readyAt": 189.70000004768372
+    },
+    "warmDeploy": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 0,
+        "compile": 68.5,
+        "transpile": 29.59999990463257,
+        "transpileInWorker": 28.90000009536743,
+        "run": 20.200000047683716,
+        "total": 118.89999985694885,
+        "toCounterRecord": 118.19999980926514
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 2,
+        "eth_getTransactionCount": 1,
+        "eth_estimateGas": 1,
+        "eth_sendRawTransaction": 1,
+        "eth_getTransactionByHash": 1,
+        "eth_getTransactionReceipt": 1
+      },
+      "deployments": {
+        "Counter": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+      }
+    },
+    "coldDeployClickedAtOnce": {
+      "ok": true,
+      "timings": {
+        "waitCompilerLoad": 119,
+        "compile": 69.40000009536743,
+        "transpile": 29.90000009536743,
+        "transpileInWorker": 29.399999856948853,
+        "run": 19.59999990463257,
+        "total": 240.5,
+        "toCounterRecord": 239.79999995231628
+      },
+      "counts": {
+        "eth_chainId": 2,
+        "eth_getBlockByNumber": 1,
+        "eth_accounts": 1,
+        "eth_feeHistory": 2,
+        "eth_getTransactionCount": 1,
+        "eth_estimateGas": 1,
+        "eth_sendRawTransaction": 1,
+        "eth_getTransactionByHash": 1,
+        "eth_getTransactionReceipt": 1
+      },
+      "deployments": {
+        "Counter": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+      }
+    },
+    "coldBootClickedAtOnce": {
+      "typescriptReadyAt": 145.29999995231628,
+      "chainBoot": 42.200000047683716,
+      "runnerBoot": 99.89999985694885,
+      "readyAt": 287.39999985694885,
+      "compilerLoad": 415,
+      "compilerReadyAt": 424.09999990463257
+    }
+  },
+  "checks": {
+    "coldDeployOk": true,
+    "coldSent": 1,
+    "coldRecordFiles": [
+      "deployments/playground/.chain",
+      "deployments/playground/Counter.json"
+    ],
+    "secondSent": 0,
+    "secondBlockUnchanged": true,
+    "secondTranscriptSaysReusing": true,
+    "editedSent": 1,
+    "editedNewAddress": true,
+    "reloadBlock": {
+      "before": 2,
+      "after": 2
+    },
+    "reloadRecordAddress": true,
+    "reloadCodeSize": 975,
+    "afterReloadSent": 0,
+    "stopBlock": {
+      "before": 2,
+      "after": 2
+    },
+    "stopCodeSize": 975,
+    "afterStopOk": true,
+    "afterStopSent": 0,
+    "warmSent": 1
+  },
+  "problems": [],
+  "fetchedCold": {
+    "/": 939,
+    "/assets/index-D160ffjs.js": 93921,
+    "/assets/compiler.worker-fy7Dg50F.js": 534,
+    "/assets/typescript.worker-BfX1OP73.js": 3541575,
+    "/assets/evm.worker-CXjHJrCn.js": 485091,
+    "/assets/runner.worker-BjPhJYA1.js": 2570610,
+    "/solc/soljson-v0.8.28+commit.7893614a.js": 9169169
+  },
+  "transcript": [
+    "[playground] TypeScript 6.0.3, solc 0.8.28, chain 31337 at block 2, 2 record files restored",
+    "[playground] Deploy (Counter.sol edited)",
+    "[rocketh] - Executing 01_deploy_counter.ts",
+    "[rocketh] @rocketh/deploy: reusing \"Counter\" at 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "[rocketh] \n",
+    "[playground] done in 111 ms; requests: {\"eth_chainId\":2,\"eth_getBlockByNumber\":1,\"eth_accounts\":1,\"eth_feeHistory\":1}",
+    "[playground] Deploy (Counter.sol edited) (with deploy/02_loop.ts)",
+    "[rocketh] - Executing 01_deploy_counter.ts",
+    "[rocketh] @rocketh/deploy: reusing \"Counter\" at 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "[rocketh] \n",
+    "[rocketh] - Executing 02_loop.ts",
+    "[script] looping forever",
+    "[playground] stopped: the runner was terminated; the chain is untouched",
+    "[playground] Deploy (Counter.sol edited)",
+    "[rocketh] - Executing 01_deploy_counter.ts",
+    "[rocketh] @rocketh/deploy: reusing \"Counter\" at 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "[rocketh] \n",
+    "[playground] done in 30 ms; requests: {\"eth_chainId\":2,\"eth_getBlockByNumber\":1,\"eth_accounts\":1,\"eth_feeHistory\":1}"
+  ],
+  "transcriptFreshDeploy": [
+    "[playground] TypeScript 6.0.3, solc 0.8.28, chain 31337 at block 0, 0 record files restored",
+    "[playground] Deploy",
+    "[rocketh] - Executing 01_deploy_counter.ts",
+    "[rocketh]   - Deploying Counter  with tx:\n      0xc924e42a44fa7554a652eceb70bd5f2a5c946948efb329aa3cb9903c9bba2a7e\n      (type 0x2, maxFeePerGas: 3000000000, maxPriorityFeePerGas: 1000000000)",
+    "[rocketh]     => 0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "[rocketh] \n",
+    "[playground] done in 119 ms; requests: {\"eth_chainId\":2,\"eth_getBlockByNumber\":1,\"eth_accounts\":1,\"eth_feeHistory\":2,\"eth_getTransactionCount\":1,\"eth_estimateGas\":1,\"eth_sendRawTransaction\":1,\"eth_getTransactionByHash\":1,\"eth_getTransactionReceipt\":1}"
+  ],
+  "failures": {
+    "unsupportedImport": {
+      "ok": false,
+      "stage": "run",
+      "errorName": "UnsupportedImportError",
+      "error": "deploy/02_bad.ts imports \"viem/utils\", which the playground cannot provide. It resolves relative imports to project files, and these packages: rocketh, @rocketh/deploy, @rocketh/proxy, @rocketh/diamond, @rocketh/read-execute, @rocketh/viem, @rocketh/signer, @rocketh/unknown-signer, @rocketh/web, viem.",
+      "sent": 0
+    },
+    "syntaxError": {
+      "ok": false,
+      "stage": "transpile",
+      "error": "Expression expected.",
+      "sent": 0
+    },
+    "touchesDocument": {
+      "ok": false,
+      "stage": "run",
+      "errorName": "ReferenceError",
+      "error": "document is not defined",
+      "sent": 0
+    },
+    "throws": {
+      "ok": false,
+      "stage": "run",
+      "errorName": "Error",
+      "error": "this script failed on purpose",
+      "sent": 0
+    }
+  }
+}
