@@ -34,6 +34,8 @@ export async function ensureSoljson({log = console.log} = {}) {
 	const bytes = Buffer.from(await response.arrayBuffer());
 	const actual = sha256(bytes);
 	if (actual !== pinned.sha256) throw new Error(`${path}: sha256 ${actual}, expected ${pinned.sha256}`);
+	// `bytes` is what the page shows while the compiler loads; a stale value would mislead it.
+	if (bytes.length !== pinned.bytes) throw new Error(`${path}: ${bytes.length} bytes, solc.json says ${pinned.bytes}`);
 	mkdirSync(new URL('static/solc/', web), {recursive: true});
 	writeFileSync(soljsonPath, bytes);
 	log(`solc ${pinned.version}: fetched ${path} (${bytes.length} bytes), sha256 matches list.json`);

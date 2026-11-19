@@ -4,56 +4,38 @@
  * a global `Module` and is loaded with `importScripts`, which a module worker does not have.
  * Construct it with `new Worker(url)` and no `{type: 'module'}`.
  *
- * Its one import, `compileProject` (`./solidity.ts`, the same function the node tests run), is
- * inlined by the bundler, so what Vite emits is a plain script with no `import` left in it: a
- * classic worker cannot have one.
- *
- * Messages:
- * - `{type: 'load', soljsonURL}`: load the compiler now (while the reader reads the code), and
- *   answer `{type: 'loaded', loadMs}`;
- * - `{type: 'compile', id, soljsonURL, files}`: answer `{type: 'compiled', id, result, ms}`, or
- *   `{type: 'failed', id, message}` when solc itself could not run.
+ * The file is FETCHED (so the page can show how much has arrived) and then run with
+ * `importScripts` on a blob URL of what arrived. See `./compiler-host.ts` for the messages.
  */
-import {compileProject, type CompileResult, type Soljson, type SolidityCompile} from './solidity.js';
-import type {ProjectFiles} from '../project/template.js';
+import {serveCompiler} from './compiler-host.js';
+import type {Soljson} from './solidity.js';
 
-export type CompilerRequest =
-	| {type: 'load'; soljsonURL: string}
-	| {type: 'compile'; id: number; soljsonURL: string; files: ProjectFiles};
-export type CompilerReply =
-	| {type: 'loaded'; loadMs: number}
-	| {type: 'compiled'; id: number; result: CompileResult; ms: number}
-	| {type: 'failed'; id?: number; message: string};
+declare const Module: (Soljson & {calledRun?: boolean; onRuntimeInitialized?: () => void}) | undefined;
 
-declare const Module: Soljson;
-
-let compile: SolidityCompile | undefined;
-
-function load(soljsonURL: string): number {
-	const t0 = performance.now();
-	if (!compile) {
-		importScripts(soljsonURL);
-		const solidityCompile = Module.cwrap('solidity_compile', 'string', ['string', 'number', 'number']);
-		compile = (input) => solidityCompile(input, 0, 0) as string;
+async function loadSoljson(url: string, onProgress: (loaded: number) => void): Promise<Soljson> {
+	const response = await fetch(url);
+	if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${response.url}`);
+	const reader = response.body.getReader();
+	const chunks: Uint8Array<ArrayBuffer>[] = [];
+	let loaded = 0;
+	for (;;) {
+		const {done, value} = await reader.read();
+		if (done) break;
+		chunks.push(value);
+		loaded += value.length;
+		onProgress(loaded);
 	}
-	return performance.now() - t0;
+	const blobURL = URL.createObjectURL(new Blob(chunks, {type: 'text/javascript'}));
+	try {
+		importScripts(blobURL);
+	} finally {
+		URL.revokeObjectURL(blobURL);
+	}
+	if (typeof Module === 'undefined') throw new Error('soljson defined no Module');
+	const soljson = Module;
+	// With its wasm inlined, soljson has usually finished initialising by now; wait if not.
+	if (!soljson.calledRun) await new Promise<void>((resolve) => (soljson.onRuntimeInitialized = resolve));
+	return soljson;
 }
 
-const post = (reply: CompilerReply) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(reply);
-
-self.onmessage = (event: MessageEvent<CompilerRequest>) => {
-	const request = event.data;
-	const id = request.type === 'compile' ? request.id : undefined;
-	try {
-		const loadMs = load(request.soljsonURL);
-		if (request.type === 'load') {
-			post({type: 'loaded', loadMs});
-			return;
-		}
-		const t0 = performance.now();
-		const result = compileProject(compile!, request.files);
-		post({type: 'compiled', id: request.id, result, ms: performance.now() - t0});
-	} catch (error) {
-		post({type: 'failed', id, message: error instanceof Error ? error.message : String(error)});
-	}
-};
+serveCompiler(self as unknown as Parameters<typeof serveCompiler>[0], loadSoljson);

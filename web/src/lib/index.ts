@@ -20,6 +20,9 @@ import {
 } from './core/utils/web/url';
 import {createRouteHandler, resolvePath} from './kit/paths';
 import {openFromNotification} from './kit/notification-navigation';
+import solc from '../../solc.json';
+import {createPlaygroundSession} from './playground/session';
+import {browserWorkers} from './playground/workers';
 
 /**
  * The notifications service is generic: a notification is just a title/body/
@@ -60,3 +63,20 @@ export const {route, isSameRoute, isParentRoute, params} = createRouteHandler(
 );
 
 console.log(`VERSION: ${version}`);
+
+/**
+ * A playground session for this page, its workers not started until `start()`.
+ *
+ * The compiler's URL is made ABSOLUTE here: the compiler worker fetches it, and a relative URL
+ * would resolve against the worker's own location, under `_app/`, rather than the page's.
+ */
+export function createPlayground() {
+	return createPlaygroundSession({
+		workers: browserWorkers(),
+		soljsonURL: new URL(resolvePath(`/solc/${solc.path}`), document.baseURI).href,
+		compilerBytes: solc.bytes,
+		chainDB: 'rocketh-playground-chain',
+		deploymentsDB: 'rocketh-playground-deployments',
+	});
+}
+export const SOLC_VERSION = solc.version;

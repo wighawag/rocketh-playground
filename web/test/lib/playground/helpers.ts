@@ -28,9 +28,16 @@ async function loadSoljson(path: string): Promise<Soljson> {
 	});
 }
 
+let soljson: Promise<Soljson> | undefined;
+/** The shipped soljson, loaded in node once per test file. */
+export function nodeSoljson(): Promise<Soljson> {
+	soljson ??= ensureSoljson({log: () => {}}).then(loadSoljson);
+	return soljson;
+}
+
 let compiler: Promise<SolidityCompile> | undefined;
 export function solidityCompile(): Promise<SolidityCompile> {
-	compiler ??= ensureSoljson({log: () => {}}).then(loadSoljson).then(solidityCompileOf);
+	compiler ??= nodeSoljson().then(solidityCompileOf);
 	return compiler;
 }
 
