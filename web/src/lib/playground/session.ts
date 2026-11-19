@@ -15,6 +15,10 @@
  * `artifacts.Counter` from the declarations a compile generates, which exist before any Deploy:
  * the session compiles the project in the background as soon as the compiler is ready, and again
  * (debounced) after each edit to a `.sol` file.
+ *
+ * The Contracts view reads and writes through it too: `provider()` is the node, for reads, and
+ * `transact()` runs one write with the chain to itself (phase `sending`), only while the session
+ * is `ready`, so a write never lands between a run's nonce lookup and its send.
  */
 import {writable, type Readable} from 'svelte/store';
 import {wrap, type Endpoint, type Remote} from 'comlink';
@@ -30,6 +34,7 @@ import type {RunOutcome} from './runner/run.js';
 import {CHAIN_ID} from './runner/compose-config.js';
 import {INITIAL_BALANCE, TEST_ADDRESSES} from './runner/test-keys.js';
 import {formatDiagnostic, type Diagnostic} from './diagnostic.js';
+import {phaseLabel} from './format.js';
 import {startingProject, type ProjectFiles} from './project/template.js';
 
 /** What the session needs of a worker: a `Worker`, or a MessagePort with a `terminate` in tests. */
@@ -72,7 +77,20 @@ export type LanguageServiceState = {
 	error?: string;
 };
 
-export type Phase = 'idle' | 'booting' | 'ready' | 'compiling' | 'transpiling' | 'running' | 'stopping' | 'failed';
+export type Phase =
+	| 'idle'
+	| 'booting'
+	| 'ready'
+	| 'compiling'
+	| 'transpiling'
+	| 'running'
+	| 'stopping'
+	/** A write from the Contracts view is on its way to the chain. */
+	| 'sending'
+	| 'failed';
+
+/** What the session's chain offers the Contracts view: an EIP-1193-style `request`. */
+export type ChainProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
 
 export type TranscriptLine = {seq: number; source: LogSource; text: string; at: number};
 
@@ -103,6 +121,12 @@ export type PlaygroundState = {
 	diagnostics: Diagnostic[];
 	blockNumber?: number;
 	lastRun?: LastRun;
+	/**
+	 * The reader's named accounts, name to address, as the last run that loaded the config
+	 * reported them (`RunOutcome.namedAccounts`). Undefined before any run: the config is user
+	 * code, and only the runner evaluates it.
+	 */
+	namedAccounts?: Record<string, string>;
 };
 
 export type PlaygroundSession = Readable<PlaygroundState> & {
@@ -111,6 +135,13 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 	stop(): Promise<void>;
 	edit(path: string, text: string): void;
 	select(path: string): void;
+	/** The in-tab chain, for the Contracts view's reads, once it has started. */
+	provider(): ChainProvider | undefined;
+	/**
+	 * Run `send` (a write) with the chain to itself: only while `ready`, in phase `sending`, and
+	 * the block number is refreshed after. Rejects, sending nothing, when the session is busy.
+	 */
+	transact<T>(send: (provider: ChainProvider) => Promise<T>): Promise<T>;
 	/** The TypeScript worker, for the editor's language-service extensions, once it is ready. */
 	languageService(): Remote<TypeScriptWorkerApi> | undefined;
 	dispose(): Promise<void>;
@@ -396,6 +427,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		});
 		await refreshBlockNumber();
 		if (result === 'stopped') return finish({outcome: 'stopped', stage: 'run', sent: 0});
+		if (result.namedAccounts) set({namedAccounts: result.namedAccounts});
 		const sent = result.requests.eth_sendRawTransaction ?? 0;
 		const ms = performance.now() - t0;
 		if (result.ok) {
@@ -455,5 +487,21 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	const languageService = () => (state.languageService.status === 'ready' ? typescript : undefined);
 
-	return {subscribe: store.subscribe, start, deploy, stop, edit, select, languageService, dispose};
+	const provider = (): ChainProvider | undefined => (node ? (node as unknown as ChainProvider) : undefined);
+
+	async function transact<T>(send: (provider: ChainProvider) => Promise<T>): Promise<T> {
+		if (state.phase !== 'ready' || !node) {
+			throw new Error(`The chain is busy (${phaseLabel(state.phase).toLowerCase()}); nothing was sent.`);
+		}
+		set({phase: 'sending'});
+		try {
+			return await send(node as unknown as ChainProvider);
+		} finally {
+			await refreshBlockNumber().catch(() => {});
+			// `dispose` may have run meanwhile; only a session still sending goes back to ready
+			if ((state.phase as Phase) === 'sending') set({phase: 'ready'});
+		}
+	}
+
+	return {subscribe: store.subscribe, start, deploy, stop, edit, select, provider, transact, languageService, dispose};
 }

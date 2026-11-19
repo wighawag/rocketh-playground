@@ -23,6 +23,7 @@ const PHASES: Record<Phase, string> = {
 	transpiling: 'Preparing the scripts',
 	running: 'Running the deploy scripts',
 	stopping: 'Stopping',
+	sending: 'Sending a transaction',
 	failed: 'Something went wrong',
 };
 

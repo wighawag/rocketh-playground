@@ -167,6 +167,85 @@ test('switching files keeps what was typed in each', async ({page}) => {
 	await expect(page.locator(TRANSCRIPT)).toContainText('edited in the editor');
 });
 
+/** A function's card on the Contracts view. */
+const card = (page: Page, name: string) => page.locator(`[data-testid="function"][data-function="${name}"]`);
+
+async function openContract(page: Page, name: string) {
+	await page.locator(`[data-testid="contract-list"] [data-contract="${name}"]`).click();
+	await expect(page.getByTestId('contract-name')).toHaveText(name, {timeout: 30_000});
+}
+
+async function send(page: Page, name: string, args: Record<string, string> = {}) {
+	await page.getByTestId('tab-write').click();
+	for (const [label, value] of Object.entries(args)) await card(page, name).getByLabel(label).fill(value);
+	await card(page, name).getByTestId('call').click();
+}
+
+async function read(page: Page, name: string) {
+	await page.getByTestId('tab-read').click();
+	await card(page, name).getByTestId('call').click();
+	return card(page, name).getByTestId('call-result');
+}
+
+test('the Contracts view reads and calls Counter, from the deployer or the admin, and a Deploy after still sends nothing', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await expect(page.getByTestId('contract-list')).toContainText('Deploy to read and call your contracts.');
+	await deploy(page, /^1 transaction sent$/);
+	await page.locator('[data-testid="record-files"] [data-path="deployments/playground/Counter.json"]').click();
+	const record = JSON.parse((await page.getByTestId('record').textContent())!);
+	await openContract(page, 'Counter');
+	await expect(page.getByTestId('contract-address')).toHaveText(record.address);
+	// the config's names, as the run reported them, the deployer first
+	await expect(page.getByTestId('send-from')).toHaveValue('0');
+	await expect(page.getByTestId('send-from').locator('option')).toHaveText(['deployer (0xf39F...2266)', 'admin (0x7099...79C8)', /^account 2 \(/, /^account 3 \(/, /^account 4 \(/]);
+
+	await send(page, 'inc');
+	const mined = card(page, 'inc').getByTestId('call-transaction');
+	await expect(mined).toHaveAttribute('data-status', 'success');
+	await expect(mined).toContainText('Transaction mined in block 2');
+	await expect(mined).toContainText('from deployer');
+	await expect(card(page, 'inc').getByTestId('tx-hash')).toHaveText(/^0x[0-9a-f]{64}$/);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 2');
+	await expect(await read(page, 'x')).toHaveText('"1"');
+
+	await send(page, 'incBy', {by: '0'});
+	await expect(card(page, 'incBy').getByTestId('call-error')).toHaveText('reverted: incBy: increment should be positive');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 2');
+
+	await page.getByTestId('send-from').selectOption({label: 'admin (0x7099...79C8)'});
+	await send(page, 'inc');
+	await expect(card(page, 'inc').getByTestId('call-transaction')).toContainText('from admin');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 3');
+	await expect(await read(page, 'x')).toHaveText('"2"');
+
+	await deploy(page, /^Up to date: nothing sent$/);
+	await expect(page.locator(TRANSCRIPT)).toContainText('reusing "Counter"');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 3');
+});
+
+test('the Contracts view follows a redeploy, and stays usable after a failed run', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await deploy(page, /^1 transaction sent$/);
+	await openContract(page, 'Counter');
+	const first = await page.getByTestId('contract-address').textContent();
+
+	await editFile(page, COUNTER, template(COUNTER).replace('uint public x;', 'uint public x;\n  uint public y;'));
+	await deploy(page, /^1 transaction sent$/);
+	await openContract(page, 'Counter');
+	await expect(page.getByTestId('contract-address')).not.toHaveText(first!);
+	await page.getByTestId('tab-read').click();
+	await expect(card(page, 'y')).toBeVisible();
+
+	await editFile(page, DEPLOY, template(DEPLOY).replace('async ({deploy, namedAccounts}) => {', "async ({deploy, namedAccounts}) => {\n\t\tthrow new Error('failed on purpose');"));
+	await deploy(page, /^The run failed$/);
+	await openContract(page, 'Counter');
+	await send(page, 'inc');
+	await expect(card(page, 'inc').getByTestId('call-transaction')).toHaveAttribute('data-status', 'success');
+	await expect(await read(page, 'y')).toHaveText('"0"');
+});
+
 test.describe('on a phone', () => {
 	// Pixel 7 without its `defaultBrowserType`, which a describe group cannot set: the viewport,
 	// the touch screen and the mobile user agent are what matter here.
@@ -193,5 +272,24 @@ test.describe('on a phone', () => {
 		await page.getByTestId('deploy').tap();
 		await expect(page.getByTestId('last-run')).toHaveText(/^1 transaction sent$/, {timeout: 60_000});
 		await expect(page.locator(TRANSCRIPT)).toContainText('typed on a phone');
+	});
+
+	test('the Contracts view fits the screen, and a write goes through', async ({page}) => {
+		await page.goto(PLAIN_URL);
+		await ready(page);
+		await page.getByTestId('deploy').tap();
+		await expect(page.getByTestId('last-run')).toHaveText(/^1 transaction sent$/, {timeout: 60_000});
+		await page.locator('[data-testid="contract-list"] [data-contract="Counter"]').tap();
+		await page.getByTestId('tab-write').tap();
+		await card(page, 'incBy').getByLabel('by').fill('3');
+		await card(page, 'incBy').getByTestId('call').tap();
+		await expect(card(page, 'incBy').getByTestId('call-transaction')).toHaveAttribute('data-status', 'success');
+		const viewport = page.viewportSize()!;
+		for (const testid of ['contracts', 'send-from', 'tx-hash']) {
+			const box = (await page.getByTestId(testid).first().boundingBox())!;
+			expect(box.x).toBeGreaterThanOrEqual(0);
+			expect(box.x + box.width, testid).toBeLessThanOrEqual(viewport.width + 1);
+		}
+		await page.getByTestId('contracts').screenshot({path: test.info().outputPath('contracts-on-a-phone.png')});
 	});
 });
