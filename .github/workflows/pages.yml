@@ -1,0 +1,85 @@
+# Builds the playground and publishes it on GitHub Pages.
+#
+# The site is the static build in `web/build` (adapter-static, with a `404.html` fallback). It is
+# built with relative paths, so the same build works at https://wighawag.github.io/rocketh-playground/
+# and on a custom domain (play.rocketh.dev, set in the repository's Pages settings, not here).
+# GitHub Pages sets no custom headers, and none are needed: nothing here uses SharedArrayBuffer.
+#
+# The build fetches the pinned solc once from binaries.soliditylang.org and refuses it unless its
+# sha256 matches `web/solc.json` and that host's list.json (`web/scripts/soljson.mjs`).
+#
+# Runs on a push to main, and by hand (Actions, "Deploy to Pages", "Run workflow"). A run by hand
+# from another branch only deploys if the `github-pages` environment allows that branch.
+
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nothing at workflow level: each job grants its own scopes.
+permissions: {}
+
+# One deployment at a time; a queued run waits rather than cancelling the one in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # configure-pages reads the Pages settings; only `deploy` can write.
+      pages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The build publishes through the Pages artifact, never a git push.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.28.1
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile --ignore-scripts
+
+      # What `pnpm i` runs as `prepare` when scripts are on: the PWA icons and tags, and
+      # SvelteKit's generated files. Run here on its own, so no dependency's script runs.
+      - name: Prepare
+        run: pnpm --filter ./web run prepare
+
+      - name: Build
+        run: pnpm web:build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: web/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
