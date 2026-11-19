@@ -10,7 +10,12 @@
 	  and whether it succeeded, instead of a link to jolly-roger's explorer
 	  ($lib/core/ui/ethereum/TransactionHash.svelte, whose imports reach jolly-roger's app layer);
 	- `canWrite`, so a write waits while a run uses the chain;
-	- the unused Address import is gone; data-testid attributes for the browser tests.
+	- the unused Address import is gone; data-testid attributes for the browser tests;
+	- smaller ones: `min-w-0` and `break-all` so a long signature wraps on a phone; a result is
+	  shown and counted when it is `!== null` (so a `0n` read counts, where the original tested
+	  truthiness); Clear also clears an error alone; an error is summarised by
+	  `callErrorMessage` (the revert reason) rather than shown as `e.message`, and not logged;
+	  the inputs' ids are prefixed with the address and the full signature (overloads differ).
 -->
 <script lang="ts">
 	import type {AbiFunction} from 'viem';
@@ -19,6 +24,7 @@
 	import FunctionInputs from './FunctionInputs.svelte';
 	import {
 		formatFunctionSignature,
+		getFunctionSignature,
 		isViewFunction,
 		formatOutputJSON,
 	} from '../lib/utils';
@@ -56,7 +62,7 @@
 	});
 
 	let isView = $derived(isViewFunction(abiItem.stateMutability));
-	let idPrefix = $derived(`${contract.address}-${functionName}-`);
+	let idPrefix = $derived(`${contract.address}-${getFunctionSignature(abiItem)}-`);
 </script>
 
 <Card.Root class="border-2" data-testid="function" data-function={functionName}>

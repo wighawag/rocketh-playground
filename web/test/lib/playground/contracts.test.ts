@@ -6,7 +6,7 @@
 import {chain, project, run, sent} from './helpers.js';
 import {describe, it, expect, beforeAll} from 'vitest';
 import {createVFSDeploymentStore} from '@rocketh/web';
-import type {AbiFunction} from 'viem';
+import {ContractFunctionRevertedError, encodeErrorResult, type Abi, type AbiFunction} from 'viem';
 import {
 	convertInputValues,
 	getFunctionSignature,
@@ -70,6 +70,24 @@ describe('input conversion and validation (copied from jolly-roger)', () => {
 	it('names an overload by its full signature, and prints a result with its bigints', () => {
 		expect(getFunctionSignature(fn([{name: 'p', type: 'tuple[]', components: [{name: 'a', type: 'address'}]}], 'g'))).toBe('g((address)[])');
 		expect(formatOutputJSON([1n, 'x'])).toBe('[\n  "1",\n  "x"\n]');
+	});
+});
+
+describe('a revert, in one line', () => {
+	const abi = [
+		{type: 'error', name: 'TooSmall', inputs: [{name: 'given', type: 'uint256'}, {name: 'who', type: 'address'}]},
+	] as const satisfies Abi;
+	const reverted = (data: `0x${string}`, errorAbi: Abi = abi) => new ContractFunctionRevertedError({abi: errorAbi, data, functionName: 'f'});
+
+	it('names a custom error with its arguments', () => {
+		const data = encodeErrorResult({abi, errorName: 'TooSmall', args: [3n, TEST_ADDRESSES[1]]});
+		expect(callErrorMessage(reverted(data))).toBe(`reverted: TooSmall(3, "${TEST_ADDRESSES[1]}")`);
+	});
+
+	it('says when the error is not in the ABI, and when there is no reason at all', () => {
+		const data = encodeErrorResult({abi, errorName: 'TooSmall', args: [3n, TEST_ADDRESSES[1]]});
+		expect(callErrorMessage(reverted(data, []))).toMatch(/^reverted with an error the ABI does not declare \(0x[0-9a-f]{8}\)$/);
+		expect(callErrorMessage(reverted('0x'))).toBe('reverted, with no reason given');
 	});
 });
 

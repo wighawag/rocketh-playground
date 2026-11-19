@@ -35,7 +35,7 @@ import {
 } from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 import {convertInputValues} from '../../../routes/contracts/lib/utils.js';
-import {errorMessage} from '../../core/utils/format/index.js';
+import {bigIntReplacer, errorMessage} from '../../core/utils/format/index.js';
 import {CHAIN_ID} from '../runner/compose-config.js';
 import {TEST_KEYS} from '../runner/test-keys.js';
 
@@ -115,15 +115,24 @@ export async function writeFunction(params: {
 	return {hash, status: receipt.status, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, from: account.address};
 }
 
+function formatArg(value: unknown): string {
+	return typeof value === 'bigint' ? value.toString() : JSON.stringify(value, bigIntReplacer);
+}
+
 /**
- * One line for a failed read or write: `reverted: <reason>` when the contract reverted, viem's
+ * One line for a failed read or write: `reverted: <reason>` when the contract reverted (a custom
+ * error as `reverted: Name(args)`), viem's
  * short message otherwise (its full message is a multi-line dump).
  */
 export function callErrorMessage(error: unknown): string {
 	if (error instanceof BaseError) {
 		const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
 		if (reverted instanceof ContractFunctionRevertedError) {
-			return reverted.reason ? `reverted: ${reverted.reason}` : 'reverted, with no reason given';
+			// viem sets `reason` for `Error(string)` and `Panic` only; a custom error is in `data`
+			if (reverted.reason) return `reverted: ${reverted.reason}`;
+			if (reverted.data) return `reverted: ${reverted.data.errorName}(${(reverted.data.args ?? []).map(formatArg).join(', ')})`;
+			if (reverted.signature) return `reverted with an error the ABI does not declare (${reverted.signature})`;
+			return 'reverted, with no reason given';
 		}
 		return error.shortMessage;
 	}
