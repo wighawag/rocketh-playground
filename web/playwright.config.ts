@@ -16,8 +16,11 @@ const env = (globalThis as any).process.env;
  *                      that installs ITS OWN worker at scope `/`, and where the
  *                      app must therefore leave registration alone
  *
- * `pnpm test:e2e` builds first: the app only registers a service worker in a
- * production build, so running these against a dev server proves nothing.
+ * They run against the production build in `build/`: the app only registers a
+ * service worker in a production build, so running these against a dev server
+ * proves nothing. `pnpm test:e2e` builds and then runs them; `pnpm e2e` runs
+ * them on the build already there, which is what the root `pnpm verify` does
+ * right after its own `web:build`, so it does not build twice.
  */
 export default defineConfig({
 	testDir: './e2e/tests',
