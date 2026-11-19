@@ -15,3 +15,7 @@ static/pwa
 /playwright-report
 /blob-report
 /.playwright
+
+# The compiler is fetched and checked by scripts/soljson.mjs, never committed (9 MB).
+# Its LICENSE.txt and README.md beside it are committed.
+static/solc/soljson-*.js

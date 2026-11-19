@@ -1,5 +1,6 @@
 import type {PluginOption} from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+import {playground} from './vite.playground.js';
 
 /**
  * The vite plugins THIS project adds to the template's.
@@ -41,6 +42,10 @@ import tailwindcss from '@tailwindcss/vite';
  * you need a plugin AFTER sveltekit, say so here rather than reaching into
  * `vite.config.ts`, and change the spread's position for everyone.
  *
+ * **The rocketh playground adds one more**, `playground()` from
+ * `vite.playground.ts`: ES-format workers and the pinned soljson. It is the
+ * playground's own, so it lives in its own file and stays out of the merge.
+ *
  * **A FUNCTION, not a constant array**, and this one is load-bearing rather
  * than stylistic. `vite.config.ts` is also the vitest config, and it declares
  * `projects` that `extends` it - so the config is evaluated several times in
@@ -61,5 +66,5 @@ export function extraPlugins(): PluginOption[] {
 	// `vite.config.ts` guarantees and what Tailwind's own SvelteKit
 	// instructions require. If that ever needs to change, it changes there,
 	// for everyone, rather than here.
-	return [tailwindcss()];
+	return [tailwindcss(), playground()];
 }
