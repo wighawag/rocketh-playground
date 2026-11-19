@@ -1,18 +1,4 @@
-############################################
-# .gitignore
-#############################################
-node_modules
-
-# Output
-/.svelte-kit
-/build
-
-# pwag
-static/pwa
-src/app.html
-
-# Env
-*.local
-############################################
-
-pnpm-lock.yaml
+# Copied verbatim from the published hardhat-deploy template (scripts/update-project-template.mjs).
+project-template/
+# The compiler and its licence, as shipped by the Solidity project.
+static/solc/
