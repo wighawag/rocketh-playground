@@ -33,7 +33,7 @@
 			<FileList state={$session} onselect={(path) => session.select(path)} />
 		</nav>
 		<section class="min-h-64 overflow-hidden">
-			<FileView state={$session} onedit={(path, text) => session.edit(path, text)} />
+			<FileView state={$session} {session} onedit={(path, text) => session.edit(path, text)} />
 		</section>
 		<section class="min-h-48 overflow-auto border-t">
 			<Transcript lines={$session.transcript} />

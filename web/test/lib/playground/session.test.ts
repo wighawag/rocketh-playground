@@ -15,6 +15,9 @@ import {exposeEVMNode} from '../../../src/lib/playground/evm/evm-host.js';
 import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
 import {createPlaygroundSession, type PlaygroundSession, type PlaygroundWorkers, type WorkerLike} from '../../../src/lib/playground/session.js';
 import {TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
+import {collectDeclarations} from '../../../scripts/declarations.mjs';
+import {BARE_MODULE_NAMES, TYPE_ONLY_MODULES} from '../../../src/lib/playground/runner/bare-modules.js';
+import {projectCompilerOptions, type Declarations} from '../../../src/lib/playground/typescript/project-options.js';
 
 const COMPILER_BYTES = 9169169;
 
@@ -36,8 +39,12 @@ function inProcess(serve: (port: MessagePort) => void): WorkerLike {
 	};
 }
 
+let declarations: Declarations | undefined;
+const loadDeclarations = async () =>
+	(declarations ??= collectDeclarations({specifiers: [...BARE_MODULE_NAMES, ...TYPE_ONLY_MODULES], compilerOptions: projectCompilerOptions(ts)}));
+
 const workers: PlaygroundWorkers = {
-	typescript: () => inProcess((port) => exposeTypeScript(ts, port)),
+	typescript: () => inProcess((port) => exposeTypeScript(ts, loadDeclarations, port)),
 	compiler: () =>
 		inProcess((port) =>
 			serveCompiler(port as never, async (_url, onProgress) => {
@@ -57,6 +64,7 @@ afterEach(async () => {
 
 async function started(db: string) {
 	const session = createPlaygroundSession({
+		compileDebounceMs: 10,
 		workers,
 		soljsonURL: 'solc/soljson.js',
 		compilerBytes: COMPILER_BYTES,
@@ -145,5 +153,26 @@ describe('a playground session', () => {
 			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n",
 		);
 		expect(await session.deploy()).toMatchObject({outcome: 'deployed', sent: 0});
+	});
+
+	it('types the project before any Deploy, flags a wrong constructor argument, and still runs it', async () => {
+		const session = await started('f');
+		await expect.poll(() => get(session).languageService.status, {timeout: 20_000}).toBe('ready');
+		const service = session.languageService()!;
+		const DEPLOY = 'deploy/01_deploy_counter.ts';
+		// the starting project, typed from the background compile's artifact types
+		await expect.poll(() => get(session).artifactTypes).toBeGreaterThan(0);
+		expect(await service.diagnostics(DEPLOY)).toEqual([]);
+
+		// Counter takes a start value; the script passes a number where viem wants a bigint
+		session.edit('contracts/Counter.sol', TEMPLATE_FILES['contracts/Counter.sol'].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }'));
+		session.edit(DEPLOY, TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],'));
+		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
+			"Type 'number' is not assignable to type 'bigint'.",
+		]);
+		expect(get(session).blockNumber).toBe(0);
+
+		const run = await session.deploy();
+		expect(run).toMatchObject({outcome: 'deployed', stage: 'run', sent: 1});
 	});
 });

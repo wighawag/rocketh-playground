@@ -49,6 +49,13 @@ export const BARE_MODULES = {
 
 export type BareModuleName = keyof typeof BARE_MODULES;
 
+/**
+ * Subpaths a project may import TYPES from (`import type {UserConfig} from 'rocketh/types'`, as the
+ * template's `rocketh/config.ts` does). A type-only import is erased by the transpiler, so they are
+ * not in the registry; the editor's language service has their declarations.
+ */
+export const TYPE_ONLY_MODULES = ['rocketh/types', '@rocketh/diamond/types'] as const;
+
 export const BARE_MODULE_NAMES = Object.keys(BARE_MODULES) as BareModuleName[];
 
 export function isBareModuleName(name: string): name is BareModuleName {

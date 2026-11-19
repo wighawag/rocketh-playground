@@ -8,6 +8,13 @@
  *
  * The workers are a parameter (`./workers.ts` makes the browser's), so the node tests run a whole
  * session with the same hosts served on MessageChannels.
+ *
+ * It is also the source of truth for the editor: the editor dispatches each edit here (`edit`),
+ * and the session forwards it to the TypeScript worker's language service, which it starts after
+ * the rest has booted (the syntax-only editor is usable before). The language service types
+ * `artifacts.Counter` from the declarations a compile generates, which exist before any Deploy:
+ * the session compiles the project in the background as soon as the compiler is ready, and again
+ * (debounced) after each edit to a `.sol` file.
  */
 import {writable, type Readable} from 'svelte/store';
 import {wrap, type Endpoint, type Remote} from 'comlink';
@@ -49,6 +56,20 @@ export type SessionOptions = {
 	chainDB?: string;
 	deploymentsDB?: string;
 	files?: ProjectFiles;
+	/** How long after the last edit to a `.sol` file the background compile starts. */
+	compileDebounceMs?: number;
+};
+
+export type LanguageServiceState = {
+	status: 'off' | 'loading' | 'ready' | 'failed';
+	/**
+	 * From `start()` to the language service answering, how long its declarations took to load,
+	 * and how long building and first checking the program took in the worker.
+	 */
+	readyMs?: number;
+	loadMs?: number;
+	createMs?: number;
+	error?: string;
 };
 
 export type Phase = 'idle' | 'booting' | 'ready' | 'compiling' | 'transpiling' | 'running' | 'stopping' | 'failed';
@@ -68,6 +89,12 @@ export type PlaygroundState = {
 	error?: string;
 	compiler: {status: 'loading' | 'ready' | 'failed'; loaded: number; total: number; error?: string};
 	typescriptVersion?: string;
+	languageService: LanguageServiceState;
+	/**
+	 * Counts the artifact types the language service has been given (by the background compile or
+	 * a Deploy's): the editor re-reads its diagnostics when it changes.
+	 */
+	artifactTypes: number;
 	files: ProjectFiles;
 	selected: string;
 	/** The deployment store, by path: `deployments/playground/Counter.json`, `.chain`, ... */
@@ -84,6 +111,8 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 	stop(): Promise<void>;
 	edit(path: string, text: string): void;
 	select(path: string): void;
+	/** The TypeScript worker, for the editor's language-service extensions, once it is ready. */
+	languageService(): Remote<TypeScriptWorkerApi> | undefined;
 	dispose(): Promise<void>;
 };
 
@@ -97,6 +126,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	let state: PlaygroundState = {
 		phase: 'idle',
 		compiler: {status: 'loading', loaded: 0, total: options.compilerBytes},
+		languageService: {status: 'off'},
+		artifactTypes: 0,
 		files,
 		selected: Object.keys(files).find((p) => p.startsWith('deploy/')) ?? Object.keys(files)[0],
 		records: {},
@@ -167,6 +198,63 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	let typescriptWorker: WorkerLike | undefined;
 	let typescript: Remote<TypeScriptWorkerApi> | undefined;
 	let node: SlimNode | undefined;
+	let startedAt = 0;
+
+	// --- the editor's language service, and the artifact types it needs ---------------------------
+	/** The `generated/artifacts/*.d.ts` of the last compile that succeeded. */
+	let artifactTypes: ProjectFiles | undefined;
+
+	async function startLanguageService() {
+		set({languageService: {status: 'loading'}});
+		try {
+			const started = await typescript!.startLanguageService({...state.files, ...artifactTypes});
+			// What changed while it loaded: edits (which were not forwarded) and a compile's types.
+			await typescript!.setFiles(state.files);
+			if (artifactTypes) await typescript!.setArtifactTypes(artifactTypes);
+			set((s) => ({
+				languageService: {status: 'ready', readyMs: performance.now() - startedAt, loadMs: started.loadMs, createMs: started.createMs},
+				artifactTypes: s.artifactTypes + (artifactTypes ? 1 : 0),
+			}));
+		} catch (error) {
+			set({languageService: {status: 'failed', error: messageOf(error)}});
+		}
+	}
+
+	function useArtifactTypes(types: ProjectFiles) {
+		artifactTypes = types;
+		if (state.languageService.status !== 'ready') return;
+		void typescript!.setArtifactTypes(types);
+		set((s) => ({artifactTypes: s.artifactTypes + 1}));
+	}
+
+	// One background compile at a time; an edit during one asks for another after it.
+	let compiling: Promise<void> | undefined;
+	let compileAgain = false;
+	let compileTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function compileInBackground(): Promise<void> {
+		if (compiling) {
+			compileAgain = true;
+			return compiling;
+		}
+		compiling = (async () => {
+			try {
+				await compilerLoaded;
+				const compiled = await compile(state.files);
+				// A contract with an error keeps the last types, rather than none while it is typed.
+				if (compiled.ok) useArtifactTypes(compiled.types);
+			} catch {
+				// The compiler did not load or solc failed: Deploy reports it.
+			}
+		})().finally(() => {
+			compiling = undefined;
+			if (compileAgain) {
+				compileAgain = false;
+				void compileInBackground();
+			}
+		});
+		return compiling;
+	}
 
 	async function refreshBlockNumber() {
 		if (!node) return;
@@ -233,9 +321,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	async function start() {
 		if (state.phase !== 'idle') return;
 		set({phase: 'booting'});
+		startedAt = performance.now();
 		try {
-			// The compiler first: it is the long download, and it loads while the rest boots.
+			// The compiler first: it is the long download, and it loads while the rest boots. The
+			// starting project is compiled as soon as it has, for the editor's artifact types.
 			startCompiler();
+			void compileInBackground();
 			typescriptWorker = options.workers.typescript();
 			typescript = wrap<TypeScriptWorkerApi>(typescriptWorker as unknown as Endpoint);
 			const evmOptions: EVMNodeOptions & {worker: WorkerLike} = {
@@ -249,6 +340,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			set({typescriptVersion: await typescript.version});
 			await refreshBlockNumber();
 			set({phase: 'ready'});
+			// After the rest: a run does not need it, and the editor is usable without it.
+			void startLanguageService();
 		} catch (error) {
 			set({phase: 'failed', error: messageOf(error)});
 			say('error', `The playground could not start: ${messageOf(error)}`);
@@ -275,6 +368,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			return finish({outcome: 'failed', stage: 'compile', sent: 0});
 		}
 		set({diagnostics: compiled.diagnostics});
+		if (compiled.ok) useArtifactTypes(compiled.types);
 		for (const d of compiled.diagnostics) say(d.severity === 'error' ? 'error' : 'warning', formatDiagnostic(d));
 		if (!compiled.ok) {
 			say('error', 'The contracts did not compile; nothing was sent.');
@@ -335,6 +429,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	function edit(path: string, text: string) {
 		set((s) => ({files: {...s.files, [path]: text}}));
+		// Forwarded at once, so the worker has this text before the editor asks for its lints.
+		if (state.languageService.status === 'ready') void typescript!.setFiles({[path]: text});
+		if (path.endsWith('.sol') && compilerWorker) {
+			clearTimeout(compileTimer);
+			compileTimer = setTimeout(() => void compileInBackground(), options.compileDebounceMs ?? 400);
+		}
 	}
 
 	function select(path: string) {
@@ -342,6 +442,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	}
 
 	async function dispose() {
+		clearTimeout(compileTimer);
 		runner?.worker.terminate();
 		await runner?.served.close().catch(() => {});
 		compilerWorker?.terminate();
@@ -352,5 +453,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		set({phase: 'idle'});
 	}
 
-	return {subscribe: store.subscribe, start, deploy, stop, edit, select, dispose};
+	const languageService = () => (state.languageService.status === 'ready' ? typescript : undefined);
+
+	return {subscribe: store.subscribe, start, deploy, stop, edit, select, languageService, dispose};
 }

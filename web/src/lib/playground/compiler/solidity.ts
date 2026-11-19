@@ -80,15 +80,22 @@ export function solcDiagnostics(output: SolcOutput, sources: ProjectFiles): Diag
 
 /**
  * The `generated/artifacts/` modules the template imports
- * (`rocketh/deploy.ts`: `import * as artifacts from '../generated/artifacts/index.js'`).
+ * (`rocketh/deploy.ts`: `import * as artifacts from '../generated/artifacts/index.js'`), and the
+ * declarations beside them that type them.
  *
  * The layout is hardhat-deploy's "javascript" destination (`dist/generate-types.js` in the
  * published hardhat-deploy): one `<Name>.js` per deployable contract exporting `Artifact_<Name>`,
- * and an `index.js` re-exporting each as `<Name>`. The artifact object is what that generator
- * writes: hardhat's artifact fields merged with solc's output for the contract.
+ * with a `<Name>.d.ts` declaring it as the artifact's literal type, and an `index.js` re-exporting
+ * each as `<Name>`, with an `index.d.ts` of the same text. The artifact object is what that
+ * generator writes: hardhat's artifact fields merged with solc's output for the contract.
+ *
+ * The `.js` files are what a run evaluates; the `.d.ts` files are what the editor's language
+ * service reads, which is what makes `artifacts.Counter` typed and a wrong constructor argument an
+ * error before Deploy.
  */
-export function generateArtifactModules(output: SolcOutput): ProjectFiles {
-	const files: ProjectFiles = {};
+export function generateArtifactModules(output: SolcOutput): {modules: ProjectFiles; types: ProjectFiles} {
+	const modules: ProjectFiles = {};
+	const types: ProjectFiles = {};
 	let index = '';
 	for (const [sourceName, contracts] of Object.entries(output.contracts ?? {})) {
 		for (const [contractName, c] of Object.entries(contracts)) {
@@ -108,18 +115,22 @@ export function generateArtifactModules(output: SolcOutput): ProjectFiles {
 				userdoc: c.userdoc,
 				evm: {methodIdentifiers: c.evm.methodIdentifiers},
 			};
-			files[`generated/artifacts/${contractName}.js`] =
-				`export const Artifact_${contractName} = /** @type {const} **/ (${JSON.stringify(artifact, null, 2)});\n`;
+			const json = JSON.stringify(artifact, null, 2);
+			modules[`generated/artifacts/${contractName}.js`] = `export const Artifact_${contractName} = /** @type {const} **/ (${json});\n`;
+			types[`generated/artifacts/${contractName}.d.ts`] = `export declare const Artifact_${contractName}: ${json};\n`;
 			index += `export {Artifact_${contractName} as ${contractName}} from './${contractName}.js';\n`;
 		}
 	}
-	files['generated/artifacts/index.js'] = index;
-	return files;
+	modules['generated/artifacts/index.js'] = index;
+	types['generated/artifacts/index.d.ts'] = index;
+	return {modules, types};
 }
 
 export type CompileResult = {
-	/** `generated/artifacts/*.js`; empty when there are errors. */
+	/** `generated/artifacts/*.js`, what a run evaluates; empty when there are errors. */
 	artifacts: ProjectFiles;
+	/** `generated/artifacts/*.d.ts`, what the editor's language service types them with; empty when there are errors. */
+	types: ProjectFiles;
 	diagnostics: Diagnostic[];
 	ok: boolean;
 };
@@ -130,5 +141,6 @@ export function compileProject(compile: SolidityCompile, files: ProjectFiles): C
 	const output = JSON.parse(compile(JSON.stringify(standardJSONInput(sources)))) as SolcOutput;
 	const diagnostics = solcDiagnostics(output, sources);
 	const ok = !diagnostics.some((d) => d.severity === 'error');
-	return {artifacts: ok ? generateArtifactModules(output) : {}, diagnostics, ok};
+	const generated = ok ? generateArtifactModules(output) : {modules: {}, types: {}};
+	return {artifacts: generated.modules, types: generated.types, diagnostics, ok};
 }
