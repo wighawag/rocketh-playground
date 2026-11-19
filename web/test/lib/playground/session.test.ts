@@ -15,6 +15,9 @@ import {exposeEVMNode} from '../../../src/lib/playground/evm/evm-host.js';
 import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
 import {createPlaygroundSession, type PlaygroundSession, type PlaygroundWorkers, type WorkerLike} from '../../../src/lib/playground/session.js';
 import {TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
+import {TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
+import {contractsFromRecords} from '../../../src/lib/playground/contracts/records.js';
+import {writeFunction} from '../../../src/lib/playground/contracts/chain-calls.js';
 import {collectDeclarations} from '../../../scripts/declarations.mjs';
 import {BARE_MODULE_NAMES, TYPE_ONLY_MODULES} from '../../../src/lib/playground/runner/bare-modules.js';
 import {projectCompilerOptions, type Declarations} from '../../../src/lib/playground/typescript/project-options.js';
@@ -153,6 +156,36 @@ describe('a playground session', () => {
 			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n",
 		);
 		expect(await session.deploy()).toMatchObject({outcome: 'deployed', sent: 0});
+	});
+
+	it('reports the named accounts a run resolved, and gives a write the chain only while ready', async () => {
+		const session = await started('g');
+		expect(get(session).namedAccounts).toBeUndefined();
+		await session.deploy();
+		expect(get(session).namedAccounts).toEqual({deployer: TEST_ADDRESSES[0], admin: TEST_ADDRESSES[1]});
+
+		const [counter] = contractsFromRecords(get(session).records);
+		const inc = counter.writeFunctions.find((f) => f.name === 'inc')!;
+		const phases: string[] = [];
+		const unsubscribe = session.subscribe((s) => phases.push(s.phase));
+		const outcome = await session.transact((provider) => writeFunction({provider, abiItem: inc, contract: counter, inputValues: {}, keyIndex: 1}));
+		unsubscribe();
+		expect(outcome).toMatchObject({status: 'success', from: TEST_ADDRESSES[1], blockNumber: 2n});
+		expect(phases).toContain('sending');
+		expect(get(session)).toMatchObject({phase: 'ready', blockNumber: 2});
+
+		// during a run, a write is refused and sends nothing
+		session.edit(
+			'deploy/02_wait.ts',
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {dependencies: ['Counter']});\n",
+		);
+		const running = session.deploy();
+		await expect.poll(() => lines(session).includes('[script] waiting forever')).toBe(true);
+		await expect(session.transact(async () => 'sent')).rejects.toThrow('The chain is busy (running the deploy scripts); nothing was sent.');
+		await session.stop();
+		await running;
+		expect(get(session)).toMatchObject({phase: 'ready', blockNumber: 2});
+		expect(await session.transact(async () => 'sent')).toBe('sent');
 	});
 
 	it('types the project before any Deploy, flags a wrong constructor argument, and still runs it', async () => {

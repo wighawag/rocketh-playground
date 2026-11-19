@@ -15,6 +15,7 @@ import {BARE_MODULES, type BareModuleName} from './bare-modules.js';
 import {CHAIN_ID, ENVIRONMENT, composeConfig} from './compose-config.js';
 import {routeRockethLogs} from './log-hook.js';
 import {checkImports, createRegistry} from './registry.js';
+import {TEST_ADDRESSES, TEST_KEYS} from './test-keys.js';
 
 export type RequestProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
 
@@ -40,6 +41,14 @@ export type RunOutcome = {
 	error?: RunError;
 	/** Name to address, for every deployment the environment holds after the run. */
 	deployments: Record<string, string>;
+	/**
+	 * Name to address, for each named account of the reader's config: what rocketh resolved
+	 * (`env.namedAccounts`) after a run that completed, or, when a script failed after the config
+	 * loaded, what the composed config gives each name (its test key's address). Absent when the
+	 * config never loaded. The page labels its account picker with these, since it never
+	 * evaluates the config itself.
+	 */
+	namedAccounts?: Record<string, string>;
 	/** Requests the run made, by method: `eth_sendRawTransaction` absent means it sent nothing. */
 	requests: Record<string, number>;
 	ms: number;
@@ -57,6 +66,16 @@ export function deployScriptPaths(modules: ProjectFiles): string[] {
 export async function loadBareModules(names: BareModuleName[]): Promise<Partial<Record<BareModuleName, object>>> {
 	const loaded = await Promise.all(names.map(async (name) => [name, await BARE_MODULES[name]()] as const));
 	return Object.fromEntries(loaded);
+}
+
+/** Each name `composeConfig` gave a test key, with that key's address. */
+function composedNamedAccounts(accounts: Record<string, {default: string}>): Record<string, string> {
+	const named: Record<string, string> = {};
+	for (const [name, {default: value}] of Object.entries(accounts)) {
+		const index = TEST_KEYS.indexOf(value.slice('privateKey:'.length) as (typeof TEST_KEYS)[number]);
+		if (index >= 0) named[name] = TEST_ADDRESSES[index];
+	}
+	return named;
 }
 
 function toRunError(error: unknown): RunError {
@@ -77,6 +96,7 @@ export async function runDeployScripts(input: RunInput, dependencies: RunDepende
 	const t0 = performance.now();
 	const stopRouting = routeRockethLogs(logs);
 	const capture = captureConsole(logs);
+	let namedAccounts: Record<string, string> | undefined;
 	try {
 		const scripts = deployScriptPaths(input.modules);
 		if (!(CONFIG_PATH in input.modules)) throw new Error(`the project has no ${CONFIG_PATH}`);
@@ -101,6 +121,7 @@ export async function runDeployScripts(input: RunInput, dependencies: RunDepende
 		});
 
 		const config = composeConfig(configModule.config as Record<string, unknown>, signer.privateKey);
+		namedAccounts = composedNamedAccounts(config.accounts as Record<string, {default: string}>);
 		const {loadAndExecuteDeploymentsFromModules} = web.setupEnvironment(
 			config as never,
 			configModule.extensions as never,
@@ -119,11 +140,19 @@ export async function runDeployScripts(input: RunInput, dependencies: RunDepende
 				([name, d]) => [name, d.address],
 			),
 		);
-		return {ok: true, deployments, requests, ms: performance.now() - t0};
+		namedAccounts = {...(env as unknown as {namedAccounts: Record<string, string>}).namedAccounts};
+		return {ok: true, deployments, namedAccounts, requests, ms: performance.now() - t0};
 	} catch (error) {
 		const runError = toRunError(error);
 		logs.append('error', runError.message);
-		return {ok: false, error: runError, deployments: {}, requests, ms: performance.now() - t0};
+		return {
+			ok: false,
+			error: runError,
+			deployments: {},
+			...(namedAccounts ? {namedAccounts} : {}),
+			requests,
+			ms: performance.now() - t0,
+		};
 	} finally {
 		capture.release();
 		stopRouting();

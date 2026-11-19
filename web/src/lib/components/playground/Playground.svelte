@@ -7,7 +7,13 @@
 	import Transcript from './Transcript.svelte';
 
 	let {session, solcVersion}: {session: PlaygroundSession; solcVersion: string} = $props();
-	const busy = $derived($session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running');
+	const busy = $derived(
+		$session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running' || $session.phase === 'sending',
+	);
+	/** The contract the centre pane shows instead of a file, when one is picked. */
+	let contract = $state<string | undefined>();
+	// Loaded on first use: it brings viem's ABI and signing code, which a first visit does not need.
+	const loadContracts = () => import('./Contracts.svelte');
 </script>
 
 <div class="flex h-dvh flex-col bg-background text-foreground">
@@ -29,11 +35,31 @@
 	</header>
 
 	<main class="grid min-h-0 flex-1 grid-cols-1 overflow-auto md:overflow-hidden md:grid-cols-[16rem_1fr] md:grid-rows-[1fr_16rem]">
-		<nav class="overflow-auto border-b p-2 md:row-span-2 md:border-r md:border-b-0">
-			<FileList state={$session} onselect={(path) => session.select(path)} />
+		<nav class="overflow-auto border-b p-2 max-md:overflow-visible md:row-span-2 md:border-r md:border-b-0">
+			<FileList
+				state={$session}
+				selectedContract={contract}
+				onselect={(path) => {
+					contract = undefined;
+					session.select(path);
+				}}
+				oncontract={(name) => (contract = name)}
+			/>
 		</nav>
-		<section class="min-h-64 overflow-hidden">
-			<FileView state={$session} {session} onedit={(path, text) => session.edit(path, text)} />
+		<!-- On a phone the Contracts view gets most of the screen (the editor's minimum is too short
+		     for a card), scrolling within it like the editor; the page scrolls to the transcript. -->
+		<section class={contract !== undefined ? 'min-h-[70dvh] overflow-hidden md:min-h-64' : 'min-h-64 overflow-hidden'}>
+			{#if contract !== undefined}
+				{#await loadContracts()}
+					<p class="p-3 text-sm text-muted-foreground">Loading the Contracts view...</p>
+				{:then {default: Contracts}}
+					<Contracts {session} name={contract} />
+				{:catch error}
+					<p class="p-3 text-sm text-red-400">The Contracts view did not load: {error.message}</p>
+				{/await}
+			{:else}
+				<FileView state={$session} {session} onedit={(path, text) => session.edit(path, text)} />
+			{/if}
 		</section>
 		<section class="min-h-48 overflow-auto border-t">
 			<Transcript lines={$session.transcript} />
