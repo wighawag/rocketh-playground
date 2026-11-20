@@ -4,8 +4,8 @@
  *
  * Nothing it runs writes to a shared location: the pnpm store, every XDG folder (so pnpm's
  * metadata cache, hardhat's compiler cache and hardhat's config) point inside the temporary
- * folder, and the environment pnpm gives the test run (`npm_*`, `PNPM_*`, the `.bin` folders on
- * `PATH`) is not passed on, so the project installs as it would from a reader's shell.
+ * folder, and the environment pnpm gives the test run (`npm_*`, `PNPM_*`, this repository's `.bin`
+ * folders on `PATH`) is not passed on, so the project installs as it would from a reader's shell.
  *
  * Used by `installs-and-deploys.export.ts`, which `pnpm test:export` runs.
  */
@@ -18,7 +18,8 @@ import {
 	lstatSync,
 } from 'node:fs';
 import {homedir} from 'node:os';
-import {dirname, join, relative, sep} from 'node:path';
+import {dirname, join, relative, resolve, sep} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {strFromU8, unzipSync} from 'fflate';
 
 /** The commands, in order, as the exported README names them. */
@@ -69,9 +70,25 @@ export function realXdg(env: NodeJS.ProcessEnv = process.env) {
 	};
 }
 
-/** The environment a reader's shell would have, without what pnpm and vitest add to a test run. */
+/** This repository's root: this file is `web/test/export/install-export.ts`. */
+export const REPOSITORY_ROOT = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	'../../..',
+);
+
+/**
+ * The environment a reader's shell would have, without what pnpm and vitest add to a test run.
+ *
+ * Every `PATH` entry inside `repository` is dropped: pnpm puts the root's and `web/`'s
+ * `node_modules/.bin` there, and the exported project must not find this repository's binaries
+ * (its hardhat, its tsx) instead of installing its own. Only those: an entry outside the
+ * repository stays even when it is a `node_modules/.bin`, because that is where a reader's pnpm
+ * can live (`pnpm/action-setup` installs it in `~/setup-pnpm/node_modules/.bin` on GitHub's
+ * runners), and without it `pnpm i` cannot start.
+ */
 export function readerEnv(
 	env: NodeJS.ProcessEnv = process.env,
+	repository: string = REPOSITORY_ROOT,
 ): NodeJS.ProcessEnv {
 	const out: NodeJS.ProcessEnv = {};
 	for (const [name, value] of Object.entries(env)) {
@@ -80,9 +97,14 @@ export function readerEnv(
 		if (name === 'INIT_CWD' || name === 'NODE_ENV' || name === 'TEST') continue;
 		out[name] = value;
 	}
+	const root = resolve(repository);
+	const inside = (entry: string) => {
+		const path = resolve(entry);
+		return path === root || path.startsWith(root + sep);
+	};
 	if (out.PATH)
 		out.PATH = out.PATH.split(':')
-			.filter((entry) => !entry.split(sep).includes('node_modules'))
+			.filter((entry) => entry !== '' && !inside(entry))
 			.join(':');
 	return out;
 }
