@@ -4,7 +4,7 @@ slug: share-link
 spec: rocketh-playground
 blockedBy: [download-project-zip]
 covers: [12]
-needsAnswers: true
+needsAnswers: false
 ---
 
 ## Answers (maintainer, 2026-11-20)
@@ -43,3 +43,9 @@ A Share button writes the project files, compressed with `fflate`, into the URL 
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Applied answers 2026-11-20
+
+### q1: 'task:share-link' was bounced — how should we proceed?
+
+Retry, continuing from the kept branch. The gate failed only because another process held port 4273 when the e2e step started (the check and the unit tests passed); the port is free again. The conductor rebases the kept branch onto main by hand, then re-dispatches. Before Playwright, check ports 4273 and 4274 are free (`ss -ltnp`) and if not set `E2E_GATEWAY_PLAIN_PORT`/`E2E_GATEWAY_SW_PORT` to free ports.
