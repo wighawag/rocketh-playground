@@ -45,6 +45,7 @@ import {formatDiagnostic, type Diagnostic} from './diagnostic.js';
 import {phaseLabel} from './format.js';
 import {startingProject, type ProjectFiles} from './project/template.js';
 import {openSavedProject, type SavedProject} from './project/saved-project.js';
+import {MIGRATION_GUIDE_LABEL, MIGRATION_GUIDE_URL, V1_SCRIPT_HINT, looksLikeV1Script} from './migration.js';
 
 /** What the session needs of a worker: a `Worker`, or a MessagePort with a `terminate` in tests. */
 export type WorkerLike = {
@@ -109,7 +110,10 @@ export type Phase =
 /** What the session's chain offers the Contracts view: an EIP-1193-style `request`. */
 export type ChainProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
 
-export type TranscriptLine = {seq: number; source: LogSource; text: string; at: number};
+/** A page the transcript points to after its text, opened in a new tab. */
+export type TranscriptLink = {href: string; label: string};
+
+export type TranscriptLine = {seq: number; source: LogSource; text: string; at: number; link?: TranscriptLink};
 
 export type LastRun = {
 	outcome: 'deployed' | 'failed' | 'stopped';
@@ -203,8 +207,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	};
 
 	let seq = 0;
-	function say(source: LogSource, text: string) {
-		const line = {seq: seq++, source, text, at: Date.now()};
+	function say(source: LogSource, text: string, link?: TranscriptLink) {
+		const line: TranscriptLine = {seq: seq++, source, text, at: Date.now(), ...(link ? {link} : {})};
 		set((s) => ({transcript: [...s.transcript, line].slice(-TRANSCRIPT_LIMIT)}));
 	}
 
@@ -505,6 +509,9 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 					? `Done in ${ms.toFixed(0)} ms: nothing to send, everything is deployed already.`
 					: `Done in ${ms.toFixed(0)} ms: ${sent} transaction${sent === 1 ? '' : 's'} sent.`,
 			);
+		} else if (result.error && looksLikeV1Script(result.error)) {
+			// After rocketh's own error, which the runner has logged by now.
+			say('playground', V1_SCRIPT_HINT, {href: MIGRATION_GUIDE_URL, label: MIGRATION_GUIDE_LABEL});
 		}
 		return finish({outcome: result.ok ? 'deployed' : 'failed', stage: 'run', sent});
 	}

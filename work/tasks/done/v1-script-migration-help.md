@@ -39,3 +39,12 @@ Story 5: a hardhat-deploy v1 user pastes a v1-style deploy script, sees where it
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- **The guide link is `https://rocketh.dev/hardhat-deploy/migration/`** ("Coming from hardhat-deploy v1: what changed"). It is the page the rocketh `documentation/index.md` sends v1 users to, and it links on to the step-by-step guide. The page is `hardhat-deploy/migration/index.md` at the rocketh repository's root, not under `documentation/`; the published URL answered 200. Alternative: link `/hardhat-deploy/migration/step-by-step/` directly.
+- **The modules treated as v1-only are `hardhat`, `hardhat-deploy`, any subpath of either, and `hardhat-deploy-ethers`.** Matching is on the exact package name, so packages that merely start with "hardhat" (such as `hardhat-gas-reporter`) are not counted. `ethers` and `@nomiclabs/*` are left out because they are not proof of a v1 script. This touches nothing outside `migration.ts`.
+- **A TypeError counts as v1 when its message names `getNamedAccounts`, `getUnnamedAccounts`, `getChainId` or `deployments`.** This relies on the names in the message rather than on browser-specific wording, so it does not depend on V8's phrasing. An ordinary TypeError such as "Cannot read properties of undefined" does not match.
+- **A `module.exports = async (...) => {...}` script is not recognised.** It fails with the playground's own error, "has no default export made with deployScript(...)", which the task did not list as one of the two shapes. Alternative: also recognise that message.
+- **The hint is a `playground`-source transcript line with an optional `link`** (a URL and a label) on `TranscriptLine`, rendered by `Transcript.svelte`. Alternative considered: making any URL in a line's text clickable. That would also turn URLs in rocketh's or the reader's own logs into links, so I did not do it.
+- **The header link sits at the start of the right-aligned info group** (beside the compiler and TypeScript versions), as small underlined text.
