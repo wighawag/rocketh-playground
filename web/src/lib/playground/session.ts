@@ -31,7 +31,7 @@ import type {TypeScriptWorkerApi} from './typescript/typescript-host.js';
 import type {EVMNodeOptions} from './evm/evm-host.js';
 import type {RunnerReply, RunnerRequest} from './runner/protocol.js';
 import type {RunOutcome} from './runner/run.js';
-import {CHAIN_ID} from './runner/compose-config.js';
+import {CHAIN_ID, STATE_HISTORY_BLOCKS} from './runner/compose-config.js';
 import {INITIAL_BALANCE, TEST_ADDRESSES} from './runner/test-keys.js';
 import {formatDiagnostic, type Diagnostic} from './diagnostic.js';
 import {phaseLabel} from './format.js';
@@ -363,6 +363,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			const evmOptions: EVMNodeOptions & {worker: WorkerLike} = {
 				worker: options.workers.evm(),
 				chainId: CHAIN_ID,
+				// so the Transactions view can replay an older transaction to find a revert's reason
+				stateHistory: {blocks: STATE_HISTORY_BLOCKS},
 				initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
 				...(options.chainDB ? {indexedDB: options.chainDB} : {}),
 			};

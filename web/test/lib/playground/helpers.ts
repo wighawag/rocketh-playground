@@ -14,7 +14,7 @@ import {compileProject, solidityCompileOf, type Soljson, type SolidityCompile} f
 import {transpileProject} from '../../../src/lib/playground/typescript/transpile.js';
 import {startingProject, type ProjectFiles} from '../../../src/lib/playground/project/template.js';
 import {runDeployScripts, type RunDependencies} from '../../../src/lib/playground/runner/run.js';
-import {CHAIN_ID} from '../../../src/lib/playground/runner/compose-config.js';
+import {CHAIN_ID, STATE_HISTORY_BLOCKS} from '../../../src/lib/playground/runner/compose-config.js';
 import {INITIAL_BALANCE, TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
 
 /** soljson is an emscripten script for `importScripts`, with no `module.exports`: evaluate it. */
@@ -48,9 +48,11 @@ export async function prepare(files: ProjectFiles) {
 	return {compiled, transpiled};
 }
 
-export function chain() {
+/** A node as the page creates it (`session.ts`); `stateHistory` can be narrowed for a test. */
+export function chain(options: {stateHistory?: {blocks: number}} = {}) {
 	return createNode({
 		chainId: CHAIN_ID,
+		stateHistory: options.stateHistory ?? {blocks: STATE_HISTORY_BLOCKS},
 		initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
 	});
 }

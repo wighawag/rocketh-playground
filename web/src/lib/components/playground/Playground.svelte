@@ -12,8 +12,12 @@
 	);
 	/** The contract the centre pane shows instead of a file, when one is picked. */
 	let contract = $state<string | undefined>();
+	/** Whether the centre pane shows the chain's transactions. */
+	let transactions = $state(false);
 	// Loaded on first use: it brings viem's ABI and signing code, which a first visit does not need.
 	const loadContracts = () => import('./Contracts.svelte');
+	// Loaded on first use too: viem's client and the decoders.
+	const loadTransactions = () => import('./Transactions.svelte');
 </script>
 
 <div class="flex h-dvh flex-col bg-background text-foreground">
@@ -39,17 +43,35 @@
 			<FileList
 				state={$session}
 				selectedContract={contract}
+				transactionsShown={transactions}
 				onselect={(path) => {
 					contract = undefined;
+					transactions = false;
 					session.select(path);
 				}}
-				oncontract={(name) => (contract = name)}
+				oncontract={(name) => {
+					transactions = false;
+					contract = name;
+				}}
+				ontransactions={() => {
+					contract = undefined;
+					transactions = true;
+				}}
 			/>
 		</nav>
-		<!-- On a phone the Contracts view gets most of the screen (the editor's minimum is too short
-		     for a card), scrolling within it like the editor; the page scrolls to the transcript. -->
-		<section class={contract !== undefined ? 'min-h-[70dvh] overflow-hidden md:min-h-64' : 'min-h-64 overflow-hidden'}>
-			{#if contract !== undefined}
+		<!-- On a phone the Contracts and Transactions views get most of the screen (the editor's
+		     minimum is too short for a card), scrolling within it like the editor; the page scrolls
+		     to the transcript. -->
+		<section class={contract !== undefined || transactions ? 'min-h-[70dvh] overflow-hidden md:min-h-64' : 'min-h-64 overflow-hidden'}>
+			{#if transactions}
+				{#await loadTransactions()}
+					<p class="p-3 text-sm text-muted-foreground">Loading the Transactions view...</p>
+				{:then {default: Transactions}}
+					<Transactions {session} />
+				{:catch error}
+					<p class="p-3 text-sm text-red-400">The Transactions view did not load: {error.message}</p>
+				{/await}
+			{:else if contract !== undefined}
 				{#await loadContracts()}
 					<p class="p-3 text-sm text-muted-foreground">Loading the Contracts view...</p>
 				{:then {default: Contracts}}

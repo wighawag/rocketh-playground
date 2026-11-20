@@ -246,6 +246,65 @@ test('the Contracts view follows a redeploy, and stays usable after a failed run
 	await expect(await read(page, 'y')).toHaveText('"0"');
 });
 
+/** The Transactions view's rows, newest first. */
+const rows = (page: Page) => page.locator('[data-testid="transaction"]');
+
+async function openTransactions(page: Page) {
+	await page.getByTestId('open-transactions').click();
+	await expect(page.getByTestId('transactions')).toBeVisible({timeout: 30_000});
+}
+
+test('the Transactions view lists the deployment and a call from the Contracts view, decoded, and keeps them over a reload', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await openTransactions(page);
+	await expect(page.getByTestId('transactions')).toContainText('No transactions yet');
+
+	// shown while Deploy runs, it is current once the run is done
+	await deploy(page, /^1 transaction sent$/);
+	await expect(rows(page)).toHaveCount(1);
+	const deployment = rows(page).first();
+	await expect(deployment).toHaveAttribute('data-kind', 'deployment');
+	await expect(deployment.getByTestId('tx-title')).toHaveText('Deploy Counter');
+	await expect(deployment.getByTestId('tx-from')).toContainText('deployer');
+	await expect(deployment.getByTestId('tx-created')).toContainText('Counter');
+	await expect(deployment.getByTestId('tx-block')).toHaveText('1');
+
+	await openContract(page, 'Counter');
+	await send(page, 'inc');
+	await expect(card(page, 'inc').getByTestId('call-transaction')).toHaveAttribute('data-status', 'success');
+	const hash = await card(page, 'inc').getByTestId('tx-hash').textContent();
+	await openTransactions(page);
+	await expect(rows(page)).toHaveCount(2);
+	const call = rows(page).first();
+	await expect(call).toHaveAttribute('data-hash', hash!);
+	await expect(call).toHaveAttribute('data-status', 'success');
+	await expect(call.getByTestId('tx-title')).toHaveText('Counter.inc');
+	await expect(call.getByTestId('tx-from')).toContainText('deployer');
+	await expect(call.getByTestId('tx-to')).toContainText('Counter');
+	await expect(call.getByTestId('tx-event')).toHaveText(/^Increment\(by: 1\)\s*from Counter$/);
+	await expect(call.getByTestId('tx-block')).toHaveText('2');
+
+	// a Deploy that sends nothing adds nothing
+	await deploy(page, /^Up to date: nothing sent$/);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 2');
+	await expect(rows(page)).toHaveCount(2);
+
+	// the chain is persisted: after a reload the list is read again from it. The names come from
+	// the config, which only a run evaluates, so until one runs the deployer is "account 0".
+	await page.reload();
+	await ready(page);
+	await openTransactions(page);
+	await expect(rows(page)).toHaveCount(2);
+	await expect(rows(page).first()).toHaveAttribute('data-hash', hash!);
+	await expect(rows(page).first().getByTestId('tx-title')).toHaveText('Counter.inc');
+	await expect(rows(page).first().getByTestId('tx-from')).toContainText('account 0');
+	await deploy(page, /^Up to date: nothing sent$/);
+	await expect(rows(page).first().getByTestId('tx-from')).toContainText('deployer');
+	await expect(rows(page)).toHaveCount(2);
+	await page.getByTestId('transactions').screenshot({path: test.info().outputPath('transactions.png')});
+});
+
 test.describe('on a phone', () => {
 	// Pixel 7 without its `defaultBrowserType`, which a describe group cannot set: the viewport,
 	// the touch screen and the mobile user agent are what matter here.
@@ -291,5 +350,28 @@ test.describe('on a phone', () => {
 			expect(box.x + box.width, testid).toBeLessThanOrEqual(viewport.width + 1);
 		}
 		await page.getByTestId('contracts').screenshot({path: test.info().outputPath('contracts-on-a-phone.png')});
+	});
+
+	test('the Transactions view fits the screen', async ({page}) => {
+		await page.goto(PLAIN_URL);
+		await ready(page);
+		await page.getByTestId('deploy').tap();
+		await expect(page.getByTestId('last-run')).toHaveText(/^1 transaction sent$/, {timeout: 60_000});
+		await page.locator('[data-testid="contract-list"] [data-contract="Counter"]').tap();
+		await page.getByTestId('tab-write').tap();
+		await card(page, 'incBy').getByLabel('by').fill('3');
+		await card(page, 'incBy').getByTestId('call').tap();
+		await expect(card(page, 'incBy').getByTestId('call-transaction')).toHaveAttribute('data-status', 'success');
+		await page.getByTestId('open-transactions').tap();
+		await expect(rows(page)).toHaveCount(2, {timeout: 30_000});
+		await expect(rows(page).first().getByTestId('tx-args')).toHaveText('(by: 3)');
+		const viewport = page.viewportSize()!;
+		for (const testid of ['transactions', 'transaction', 'tx-hash', 'tx-event']) {
+			const box = (await page.getByTestId(testid).first().boundingBox())!;
+			expect(box.x).toBeGreaterThanOrEqual(0);
+			expect(box.x + box.width, testid).toBeLessThanOrEqual(viewport.width + 1);
+		}
+		expect(await page.getByTestId('transactions').evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+		await page.getByTestId('transactions').screenshot({path: test.info().outputPath('transactions-on-a-phone.png')});
 	});
 });

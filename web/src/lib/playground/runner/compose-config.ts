@@ -16,6 +16,13 @@ import {TEST_KEYS} from './test-keys.js';
 
 export const ENVIRONMENT = 'playground';
 export const CHAIN_ID = 31337;
+/**
+ * How many blocks below its head the in-tab chain keeps the state of (webevm's `stateHistory`,
+ * persisted with the chain): the Transactions view finds a revert's reason by replaying the
+ * transaction at its block, which webevm refuses below that window. About 300 bytes per key a
+ * block changes, per block kept (webevm's measure); a call to Counter changes a handful.
+ */
+export const STATE_HISTORY_BLOCKS = 256;
 
 type AnyConfig = Record<string, unknown> & {
 	accounts?: Record<string, unknown>;
