@@ -56,6 +56,16 @@ describe('a v1-style deploy script', () => {
 		expect(looksLikeV1Script(error)).toBe(true);
 	});
 
+	it('is recognised when it is a module.exports function taking hre, which has no default export made with deployScript(...)', async () => {
+		const script = `module.exports = async (hre: any) => {\n\tconst {deployments, getNamedAccounts} = hre;\n\tconst {deployer} = await getNamedAccounts();\n\tawait deployments.deploy('Counter', {from: deployer, log: true});\n};\n`;
+		const files = project({[SCRIPT]: script});
+		const error = await failing(script);
+		expect(error).toMatchObject({name: 'Error', message: `${SCRIPT} has no default export made with deployScript(...)`});
+		expect(looksLikeV1Script(error, files)).toBe(true);
+		// The recognition reads the script's text: without the project files it cannot tell.
+		expect(looksLikeV1Script(error)).toBe(false);
+	});
+
 	it('is recognised when the runner refuses an import of hardhat', async () => {
 		const error = await failing("import {ethers} from 'hardhat';\n\nexport default async () => {\n\tconsole.log(ethers);\n};\n");
 		expect(error.name).toBe('UnsupportedImportError');
@@ -95,6 +105,18 @@ describe('an ordinary script error', () => {
 		];
 		expect(errors.map((e) => e.name)).toEqual(['Error', 'TypeError', 'ReferenceError', 'UnsupportedImportError', 'MissingFileError']);
 		for (const error of errors) expect(looksLikeV1Script(error), error.message).toBe(false);
+	});
+
+	it('is not recognised when a v2-style script only forgot deployScript(...)', async () => {
+		for (const script of [
+			"module.exports = async ({deploy, namedAccounts}: any) => {\n\tawait deploy('Counter', {account: namedAccounts.deployer, artifact: {} as any});\n};\n",
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport const script = deployScript(async ({deploy}) => {\n\tconsole.log(deploy);\n}, {});\n",
+		]) {
+			const files = project({'deploy/02_forgot.ts': script});
+			const error = await failing(files);
+			expect(error).toMatchObject({name: 'Error', message: 'deploy/02_forgot.ts has no default export made with deployScript(...)'});
+			expect(looksLikeV1Script(error, files), script).toBe(false);
+		}
 	});
 
 	it('is not recognised when only the name of an unsupported package starts like hardhat', () => {

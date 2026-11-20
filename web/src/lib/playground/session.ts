@@ -509,7 +509,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 					? `Done in ${ms.toFixed(0)} ms: nothing to send, everything is deployed already.`
 					: `Done in ${ms.toFixed(0)} ms: ${sent} transaction${sent === 1 ? '' : 's'} sent.`,
 			);
-		} else if (result.error && looksLikeV1Script(result.error)) {
+		} else if (result.error && looksLikeV1Script(result.error, projectFiles)) {
 			// After rocketh's own error, which the runner has logged by now.
 			say('playground', V1_SCRIPT_HINT, {href: MIGRATION_GUIDE_URL, label: MIGRATION_GUIDE_LABEL});
 		}
