@@ -3,6 +3,7 @@
 	import * as Dialog from '$lib/shadcn/ui/dialog';
 	import type {PlaygroundSession} from '$lib/playground/session';
 	import {compilerLabel, lastRunLabel, phaseLabel} from '$lib/playground/format';
+	import {canDownload, createProjectDownload} from '$lib/playground/project/download';
 	import FileList from './FileList.svelte';
 	import FileView from './FileView.svelte';
 	import Transcript from './Transcript.svelte';
@@ -11,6 +12,8 @@
 	const busy = $derived(
 		$session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running' || $session.phase === 'sending' || $session.phase === 'resetting',
 	);
+	// Download builds the zip on demand: fflate loads on the first press.
+	const projectDownload = createProjectDownload();
 	/** Whether the Reset confirmation is open. */
 	let confirmingReset = $state(false);
 	function confirmReset() {
@@ -36,6 +39,15 @@
 		<Button data-testid="deploy" onclick={() => session.deploy()} disabled={$session.phase !== 'ready'}>Deploy</Button>
 		<Button data-testid="stop" variant="outline" onclick={() => session.stop()} disabled={$session.phase !== 'running'}>Stop</Button>
 		<Button data-testid="reset" variant="outline" onclick={() => (confirmingReset = true)} disabled={$session.phase !== 'ready'}>Reset</Button>
+		<Button
+			data-testid="download"
+			variant="outline"
+			onclick={() => projectDownload.download($session.files)}
+			disabled={!canDownload($session.phase) || $projectDownload.status === 'building'}>Download</Button
+		>
+		{#if $projectDownload.status === 'failed'}
+			<span data-testid="download-error" class="text-sm text-red-400">The download failed: {$projectDownload.error}</span>
+		{/if}
 		<span data-testid="phase" data-phase={$session.phase} class="text-sm">
 			{phaseLabel($session.phase)}{#if busy}...{/if}
 		</span>
