@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      dorfl:
+        specifier: 0.16.0
+        version: 0.16.0
       ldenv:
         specifier: ^0.6.0
         version: 0.6.0
@@ -994,6 +997,10 @@ packages:
     resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
     engines: {node: '>=18'}
 
+  commander@14.0.3:
+    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
+    engines: {node: '>=20'}
+
   commander@7.2.0:
     resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
     engines: {node: '>= 10'}
@@ -1072,6 +1079,11 @@ packages:
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
+
+  dorfl@0.16.0:
+    resolution: {integrity: sha512-SlgLxvVtd3ZBbyoI2dPOcvs5EIlWzvSHr/iXToKh7ewENvRczA17TxmK1+Y5CU1rhij2mV6ySG2sK/wct2+Wag==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   dotenv-expand@10.0.0:
     resolution: {integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==}
@@ -2796,6 +2808,8 @@ snapshots:
 
   commander@12.1.0: {}
 
+  commander@14.0.3: {}
+
   commander@7.2.0: {}
 
   convert-source-map@2.0.0: {}
@@ -2865,6 +2879,10 @@ snapshots:
       dom-serializer: 2.0.0
       domelementtype: 2.3.0
       domhandler: 5.0.3
+
+  dorfl@0.16.0:
+    dependencies:
+      commander: 14.0.3
 
   dotenv-expand@10.0.0: {}
 

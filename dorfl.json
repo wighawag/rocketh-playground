@@ -1,0 +1,9 @@
+{
+	"dorflCmd": "node_modules/.bin/dorfl",
+	"prepare": "pnpm install && pnpm --filter ./web exec playwright install chromium",
+	"verify": "pnpm verify",
+	"harness": "pi",
+	"autoBuild": false,
+	"autoTask": false,
+	"promptGuidance": {"testFirst": true}
+}
