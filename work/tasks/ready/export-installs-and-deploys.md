@@ -2,19 +2,15 @@
 title: 'A test installs the exported project and deploys it'
 slug: export-installs-and-deploys
 spec: rocketh-playground
-needsAnswers: true
-blockedBy: [download-project-zip, bundle-budgets]
+blockedBy: [download-project-zip]
 covers: [19]
 ---
 
-<!-- open-questions -->
+## Answers (maintainer, 2026-11-20)
 
-## Open questions
-
-1. Where does this test run? It needs the network (`pnpm i`) and takes minutes. Options: inside `pnpm verify` (which would no longer work offline), as a separate script run by hand, or in a CI workflow (adding one needs the maintainer's approval).
-2. The zip builder reads the template through `import.meta.glob` (`project/template.ts`): should the test run under vitest, or should the builder take the files as a parameter so a plain node script can call it?
-
-<!-- /open-questions -->
+1. A separate script, NOT inside `pnpm verify`: `pnpm test:export` at the repository root (forwarding to `web/`), run by hand and later by `follow-rocketh-releases`' workflow. `verify` stays offline-capable and fast, so this no longer touches the `verify` script and is no longer blocked by `bundle-budgets`. Document how to run it in `web/src/lib/playground/README.md`.
+2. Run it under vitest, with its own config (for example `web/vitest.export.config.ts`, so the normal `pnpm test` does not pick it up) and a long timeout, so the zip builder keeps reading the template through `import.meta.glob` unchanged.
+3. It exports TWO projects and installs and deploys each: the starting project, and one whose `contracts/Counter.sol` the reader changed (for example a renamed function and a constructor argument, with the deploy script updated to match), which proves leaving out the template's Counter tests keeps `pnpm hardhat compile` working.
 
 ## What to build
 
@@ -24,16 +20,16 @@ A test that takes the zip Download produces for the starting project, unzips it 
 
 - [ ] The test passes on the starting project and fails, naming the step, when the export is broken (for example a package pinned to a version that does not exist).
 - [ ] It writes nothing to shared locations: the pnpm store (`--store-dir` or `npm_config_store_dir` inside the temporary folder) and hardhat's compiler cache (`XDG_CACHE_HOME` inside it) point into the temporary folder, the test asserts the real ones are untouched, and it removes the folder.
-- [ ] It runs where the answer to the open question says.
+- [ ] It runs as `pnpm test:export` (from the repository root), under vitest with its own config, and is not part of `pnpm verify` or `pnpm test`.
+- [ ] It also passes on an export whose `contracts/Counter.sol` was changed (Counter tests left out by the export).
 
 ## Blocked by
 
 - `download-project-zip`
-- `bundle-budgets` (both edit the root `verify` script if the answer is "inside `pnpm verify`")
 
 ## Prompt
 
-> Goal: prove the export installs and deploys. Build on the zip function from `download-project-zip` rather than on the UI. Answer the open question before building.
+> Goal: prove the export installs and deploys. Build on the zip function from `download-project-zip` rather than on the UI. The open questions are answered above; build to those answers.
 >
 > FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does it still match the code, `work/tasks/done/`, and the tasks it depends on? If a dependency landed differently than this task assumes, do NOT build on the stale premise: stop and report the discrepancy.
 >

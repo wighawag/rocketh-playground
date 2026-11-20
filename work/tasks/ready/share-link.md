@@ -2,20 +2,15 @@
 title: 'Share the project as a link that does not run until Deploy'
 slug: share-link
 spec: rocketh-playground
-needsAnswers: true
 blockedBy: [download-project-zip]
 covers: [12]
 ---
 
-<!-- open-questions -->
+## Answers (maintainer, 2026-11-20)
 
-## Open questions
-
-1. Opening a link while the reader has a saved project of their own: does the link replace it after asking, or open beside it (the reader's project restored when they leave the link), or something else?
-2. Does a link open on the reader's existing chain and records, or on a fresh chain with no records (the link's contracts would otherwise meet deployments from another project)?
-3. Is the fragment cleared once the link is loaded? Otherwise, with the files saved across reloads, reloading the link's URL loads the link over the reader's edits.
-
-<!-- /open-questions -->
+1. A link REPLACES the reader's saved project, after a confirmation. The confirmation says the link's project will replace their files, chain and records, and offers Download first (the existing Download, so they can keep a copy), then Open or Cancel. Cancel keeps the reader's project and opens nothing from the link. With no saved project of the reader's (a first visit, or one that is still the starting project), the link opens without asking. No second, side-by-side project.
+2. A link opens on a FRESH chain with no records, exactly as Reset leaves it (reuse `session.reset()`'s mechanism rather than a second way of clearing the stores), with the link's files in place of the starting project's. The link's contracts never meet another project's deployments.
+3. Yes: once the link's files are loaded (or the reader cancels), the fragment's `project` key is removed from the URL with `history.replaceState`, other fragment keys kept, so a reload never loads the link again over the reader's edits.
 
 ## What to build
 
@@ -27,6 +22,9 @@ A Share button writes the project files, compressed with `fflate`, into the URL 
 - [ ] A project whose encoded fragment exceeds 32 KB gets no link and is offered Download.
 - [ ] A corrupted fragment is reported and loads nothing.
 - [ ] Encoding and decoding are plain `.ts`, tested in node (round trip, the cap, a corrupted input).
+- [ ] Opening a link over a saved project of the reader's asks first: Cancel keeps their files, chain and records and opens nothing; Open (after an offered Download) shows the link's files on `chain at block 0` with no records (e2e).
+- [ ] Opening a link with no saved project of the reader's opens it without asking.
+- [ ] After a link has loaded (or been cancelled) the URL has no `project` key, and a reload shows the files as the reader left them, not the link's.
 - [ ] Tests cover the new behaviour.
 
 ## Blocked by
@@ -35,7 +33,7 @@ A Share button writes the project files, compressed with `fflate`, into the URL 
 
 ## Prompt
 
-> Goal: Share. The fragment is read once at start (only `web/src/lib/kit` may touch `$app/*`; reading `location.hash` belongs with the composition in `web/src/lib/index.ts` or a kit module). `index.ts` already reads the fragment as `key=value` pairs (`getHashParamsFromLocation`): the project is one key in that format, such as `#project=...`. Answer the open questions before building.
+> Goal: Share. The fragment is read once at start (only `web/src/lib/kit` may touch `$app/*`; reading `location.hash` belongs with the composition in `web/src/lib/index.ts` or a kit module). `index.ts` already reads the fragment as `key=value` pairs (`getHashParamsFromLocation`): the project is one key in that format, such as `#project=...`. The open questions are answered above; build to those answers.
 >
 > FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does it still match the code, `work/tasks/done/`, and the tasks it depends on? If a dependency landed differently than this task assumes, do NOT build on the stale premise: stop and report the discrepancy.
 >

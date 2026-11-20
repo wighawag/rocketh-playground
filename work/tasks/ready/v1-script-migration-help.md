@@ -2,21 +2,16 @@
 title: 'A hardhat-deploy v1 script that fails points to the migration guide'
 slug: v1-script-migration-help
 spec: rocketh-playground
-needsAnswers: true
-blockedBy: []
+blockedBy: [share-link]
 covers: [5]
 ---
 
-<!-- open-questions -->
+## Answers (maintainer, 2026-11-20)
 
-## Open questions
-
-1. What should the reader see? For example: a link to rocketh.dev's migration guide in the transcript when a script fails in a way a v1-style script does (which failures count?), a "Migrating from v1" link always visible beside the editor, or the guide in a pane next to the editor.
-2. Is a "paste a v1 script" sample part of it, and if so where does the reader find it?
-3. Which failure is the one to recognise? A v1 script's first error could be the registry refusing `hardhat-deploy/types` or `hardhat/types`, or a TypeError on `hre.deployments`, depending on how TypeScript drops type-only imports.
-4. Once answered, which tasks does it wait for? It will touch the header, the session or the transcript, which the persist, reset, download and share chain also edits, so it should be blocked by the tail of that chain.
-
-<!-- /open-questions -->
+1. Two things. (a) When a run fails in a way a v1-style script does (see 3), the transcript adds a line after rocketh's own error saying this looks like a hardhat-deploy v1 script and linking to rocketh.dev's migration guide (find its page in the rocketh repository's `documentation/`; link the published rocketh.dev URL). (b) A small "Migrating from hardhat-deploy v1?" link to the same guide, always visible (in the header or beside the editor), opening in a new tab. No guide pane.
+2. No "paste a v1 script" sample: the reader brings their own script; the guide is the help.
+3. Recognise both failures: the module loader refusing an import of `hardhat-deploy/types` or `hardhat/types` (or another v1-only module such as `hardhat-deploy` v1 entry points), and a TypeError reading `deployments`/`getNamedAccounts` on the `hre` argument. The recognition is plain `.ts`, tested in node on the actual error text the runner produces for each shape; the e2e test runs one real v1-style script.
+4. Blocked by `share-link`, the last task still to be built in the persist, reset, download and share chain that also edits the header, the session and the transcript.
 
 ## What to build
 
@@ -24,16 +19,18 @@ Story 5: a hardhat-deploy v1 user pastes a v1-style deploy script, sees where it
 
 ## Acceptance criteria
 
-- [ ] A v1-style deploy script (the shape of hardhat-deploy v1's `DeployFunction`) run in the playground shows the reader the way to the migration guide, in the form the answers decide (e2e; the exact criterion is written with the answers).
+- [ ] A v1-style deploy script (the shape of hardhat-deploy v1's `DeployFunction`) run in the playground shows the reader the way to the migration guide, as a transcript line linking rocketh.dev's migration guide, after rocketh's own error (e2e).
+- [ ] Both failure shapes (a refused v1 import, a TypeError on `hre.deployments`) are recognised, and an ordinary script error is not (node test, on the runner's real error text).
+- [ ] A "Migrating from hardhat-deploy v1?" link to the guide is always visible.
 - [ ] Tests cover the new behaviour.
 
 ## Blocked by
 
-- None: can start immediately.
+- `share-link`
 
 ## Prompt
 
-> Goal: help a v1 user migrate. rocketh's migration documentation is in the rocketh repository's `documentation/` (published at rocketh.dev). Answer the open questions before building.
+> Goal: help a v1 user migrate. rocketh's migration documentation is in the rocketh repository's `documentation/` (published at rocketh.dev). The open questions are answered above; build to those answers.
 >
 > FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does it still match the code, `work/tasks/done/`, and the tasks it depends on? If a dependency landed differently than this task assumes, do NOT build on the stale premise: stop and report the discrepancy.
 >
