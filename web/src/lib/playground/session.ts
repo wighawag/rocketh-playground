@@ -21,6 +21,11 @@
  * The Contracts view reads and writes through it too: `provider()` is the node, for reads, and
  * `transact()` runs one write with the chain to itself (phase `sending`), only while the session
  * is `ready`, so a write never lands between a run's nonce lookup and its send.
+ *
+ * `reset()` is the one action that touches the chain: only while `ready` (phase `resetting`), it
+ * ends the runner and the EVM worker, and starts both again `fresh` (a chain at block 0, an empty
+ * deployment store, each saved over its database), with the starting project's files saved over
+ * the reader's.
  */
 import {writable, type Readable} from 'svelte/store';
 import {wrap, type Endpoint, type Remote} from 'comlink';
@@ -96,6 +101,8 @@ export type Phase =
 	| 'stopping'
 	/** A write from the Contracts view is on its way to the chain. */
 	| 'sending'
+	/** `reset()`: the starting project, a fresh chain and no records, replacing what was saved. */
+	| 'resetting'
 	| 'failed';
 
 /** What the session's chain offers the Contracts view: an EIP-1193-style `request`. */
@@ -144,6 +151,11 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 	stop(): Promise<void>;
 	edit(path: string, text: string): void;
 	select(path: string): void;
+	/**
+	 * Back to a first visit, saved copies included: the starting project's files, a fresh chain at
+	 * block 0 and no records. Only while `ready`; does nothing otherwise (as `deploy` does).
+	 */
+	reset(): Promise<void>;
 	/** The in-tab chain, for the Contracts view's reads, once it has started. */
 	provider(): ChainProvider | undefined;
 	/**
@@ -240,8 +252,24 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	// --- TypeScript, chain ------------------------------------------------------------------------
 	let typescriptWorker: WorkerLike | undefined;
 	let typescript: Remote<TypeScriptWorkerApi> | undefined;
+	let evmWorker: WorkerLike | undefined;
 	let node: SlimNode | undefined;
 	let startedAt = 0;
+
+	/** The chain, in its own worker; `fresh` replaces what `chainDB` holds with a new chain. */
+	async function startChain(fresh: boolean) {
+		evmWorker = options.workers.evm();
+		const evmOptions: EVMNodeOptions & {worker: WorkerLike} = {
+			worker: evmWorker,
+			chainId: CHAIN_ID,
+			// so the Transactions view can replay an older transaction to find a revert's reason
+			stateHistory: {blocks: STATE_HISTORY_BLOCKS},
+			initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
+			...(options.chainDB ? {indexedDB: options.chainDB} : {}),
+			...(fresh ? {fresh} : {}),
+		};
+		node = await createWorkerNode(evmOptions as never);
+	}
 
 	// --- the editor's language service, and the artifact types it needs ---------------------------
 	/** The `generated/artifacts/*.d.ts` of the last compile that succeeded. */
@@ -250,8 +278,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	async function startLanguageService() {
 		set({languageService: {status: 'loading'}});
 		try {
-			const started = await typescript!.startLanguageService({...state.files, ...artifactTypes});
-			// What changed while it loaded: edits (which were not forwarded) and a compile's types.
+			const startedWith = state.files;
+			const started = await typescript!.startLanguageService({...startedWith, ...artifactTypes});
+			// What changed while it loaded: edits (which were not forwarded), a Reset (which drops the
+			// files the reader added) and a compile's types.
+			const gone = Object.keys(startedWith).filter((path) => !(path in state.files));
+			if (gone.length > 0) await typescript!.removeFiles(gone);
 			await typescript!.setFiles(state.files);
 			if (artifactTypes) await typescript!.setArtifactTypes(artifactTypes);
 			set((s) => ({
@@ -313,7 +345,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	let runner: Runner | undefined;
 	let runId = 0;
 
-	async function startRunner(): Promise<void> {
+	/** `fresh` empties the deployment store (and its database) before the runner is ready. */
+	async function startRunner(fresh = false): Promise<void> {
 		const worker = options.workers.runner();
 		const channel = new MessageChannel();
 		const served = await node!.serveOn(channel.port1);
@@ -354,7 +387,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 				}
 			});
 		});
-		const init: RunnerRequest = {type: 'init', provider: channel.port2, deploymentsDB: options.deploymentsDB};
+		const init: RunnerRequest = {type: 'init', provider: channel.port2, deploymentsDB: options.deploymentsDB, ...(fresh ? {fresh} : {})};
 		worker.postMessage(init, [channel.port2]);
 		runner = current;
 		await ready;
@@ -392,15 +425,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			void compileInBackground();
 			typescriptWorker = options.workers.typescript();
 			typescript = wrap<TypeScriptWorkerApi>(typescriptWorker as unknown as Endpoint);
-			const evmOptions: EVMNodeOptions & {worker: WorkerLike} = {
-				worker: options.workers.evm(),
-				chainId: CHAIN_ID,
-				// so the Transactions view can replay an older transaction to find a revert's reason
-				stateHistory: {blocks: STATE_HISTORY_BLOCKS},
-				initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
-				...(options.chainDB ? {indexedDB: options.chainDB} : {}),
-			};
-			node = await createWorkerNode(evmOptions as never);
+			await startChain(false);
 			await startRunner();
 			// A selected record that is no more (the records are restored by now): the first script.
 			if (!(state.selected in state.files) && !(state.selected in state.records)) set({selected: firstSelected(state.files)});
@@ -495,6 +520,45 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		stopped.pending = undefined;
 	}
 
+	async function reset() {
+		if (state.phase !== 'ready' || !node || !runner) return;
+		set({phase: 'resetting'});
+		try {
+			// The runner first: its provider is a port the old node serves.
+			const ended = runner;
+			runner = undefined;
+			ended.worker.terminate();
+			await ended.served.close().catch(() => {});
+			await node.dispose().catch(() => {});
+			evmWorker?.terminate();
+			node = undefined;
+
+			const previous = state.files;
+			const selected = firstSelected(files);
+			clearTimeout(compileTimer);
+			saved?.reset(files, selected);
+			set({files, selected, records: {}, diagnostics: [], lastRun: undefined, namedAccounts: undefined});
+			// The language service and the artifact types: the starting files, then their compile.
+			if (state.languageService.status === 'ready') {
+				const gone = Object.keys(previous).filter((path) => !(path in files));
+				if (gone.length > 0) await typescript!.removeFiles(gone);
+				await typescript!.setFiles(files);
+				set((s) => ({artifactTypes: s.artifactTypes + 1}));
+			}
+			void compileInBackground();
+
+			await startChain(true);
+			await startRunner(true);
+			await saved?.flush();
+			await refreshBlockNumber();
+			say('playground', 'Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone.');
+			set({phase: 'ready'});
+		} catch (error) {
+			set({phase: 'failed', error: messageOf(error)});
+			say('error', `The playground could not reset: ${messageOf(error)}`);
+		}
+	}
+
 	function edit(path: string, text: string) {
 		set((s) => ({files: {...s.files, [path]: text}}));
 		saved?.write(path, text);
@@ -545,5 +609,5 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		}
 	}
 
-	return {subscribe: store.subscribe, start, deploy, stop, edit, select, provider, transact, languageService, dispose};
+	return {subscribe: store.subscribe, start, deploy, stop, reset, edit, select, provider, transact, languageService, dispose};
 }

@@ -129,6 +129,8 @@ test('Stop ends a script that never yields, and the chain is still there', async
 	await page.getByTestId('deploy').click();
 	await expect(page.locator(TRANSCRIPT)).toContainText('looping forever', {timeout: 60_000});
 	await expect(page.getByTestId('phase')).toHaveAttribute('data-phase', 'running');
+	// a Reset now could let the run land on the fresh chain
+	await expect(page.getByTestId('reset')).toBeDisabled();
 	await page.getByTestId('stop').click();
 	await expect(page.getByTestId('last-run')).toHaveText('Stopped');
 	await ready(page);
@@ -350,6 +352,58 @@ test('the Transactions view lists the deployment and a call from the Contracts v
 	await expect(rows(page).first().getByTestId('tx-from')).toContainText('deployer');
 	await expect(rows(page)).toHaveCount(2);
 	await page.getByTestId('transactions').screenshot({path: test.info().outputPath('transactions.png')});
+});
+
+test('Reset, once confirmed, gives the starting project on a fresh chain with no records, and a reload keeps it', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await deploy(page, /^1 transaction sent$/);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
+	// edits the language service flags: the script passes a number where viem's types want a bigint
+	const script = template(DEPLOY).replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],');
+	const counter = template(COUNTER).replace('uint public x;', 'uint public x;\n\n  constructor(uint start) {\n    x = start;\n  }');
+	await editFile(page, COUNTER, counter);
+	await editFile(page, DEPLOY, script);
+	await typed(page);
+	const flagged = page.locator('[data-testid="editor"] .cm-lintRange-error');
+	await expect(flagged).toHaveText('1', {timeout: 30_000});
+	await openContract(page, 'Counter');
+
+	// cancelled: nothing changes
+	await page.getByTestId('reset').click();
+	await expect(page.getByTestId('reset-dialog')).toBeVisible();
+	await page.getByTestId('reset-cancel').click();
+	await expect(page.getByTestId('reset-dialog')).toBeHidden();
+	await expect(page.getByTestId('contract-name')).toHaveText('Counter');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
+	await page.locator(`[data-testid="project-files"] [data-path="${DEPLOY}"]`).click();
+	await expect(editor(page)).toContainText('args: [1],');
+	await openContract(page, 'Counter');
+
+	// confirmed: the starting files, block 0, no records, the Contracts view closed
+	await page.getByTestId('reset').click();
+	await page.getByTestId('reset-confirm').click();
+	await expect(page.getByTestId('contracts')).toBeHidden();
+	await ready(page);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(page.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(page.getByTestId('last-run')).toBeHidden();
+	await expect(page.locator(TRANSCRIPT)).toContainText('Reset: the starting project, a new chain at block 0 and no deployment records.');
+	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
+	await expect(editor(page)).not.toContainText('args: [1],');
+	await expect(flagged).toHaveCount(0, {timeout: 30_000});
+	await page.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`).click();
+	await expect(editor(page)).not.toContainText('constructor(uint start)');
+
+	// a reload opens what Reset saved
+	await page.reload();
+	await ready(page);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(page.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
+	await expect(editor(page)).not.toContainText('args: [1],');
+	await deploy(page, /^1 transaction sent$/);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
 });
 
 test.describe('on a phone', () => {
