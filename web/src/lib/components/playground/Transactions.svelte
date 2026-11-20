@@ -5,8 +5,10 @@
 	method and its arguments, from and to, the block on the right. What differs: the rows come
 	decoded from a store ($lib/playground/transactions/transaction-list.ts, which reads and decodes
 	in plain .ts, where that component loads and decodes in its $effect), there is no link to an
-	explorer page (the chain is in the tab), and a row also lists its events and a revert's reason,
-	which jolly-roger shows on TransactionView.svelte. Loaded on demand by Playground.svelte.
+	explorer page (the chain is in the tab: jolly-roger's Address and TransactionHash show the
+	parties and the hash, with their copy button and no link), and a row also lists its events and
+	a revert's reason, which jolly-roger shows on TransactionView.svelte. Loaded on demand by
+	Playground.svelte.
 -->
 <script lang="ts">
 	import * as Card from '$lib/shadcn/ui/card';
@@ -16,7 +18,9 @@
 	import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import HashIcon from '@lucide/svelte/icons/hash';
-	import {truncateHex, formatValue} from '$lib/core/utils/format';
+	import {formatValue} from '$lib/core/utils/format';
+	import Address from '$lib/core/ui/ethereum/Address.svelte';
+	import TransactionHash from '$lib/core/ui/ethereum/TransactionHash.svelte';
 	import {formatTimestamp} from '../../../routes/explorer/lib/utils';
 	import {transactionListFor} from '$lib/playground/transactions/transaction-list';
 	import {argsText, type Labelled} from '$lib/playground/transactions/decode';
@@ -29,7 +33,7 @@
 {#snippet who(party: Labelled, testid: string)}
 	<span class="inline-flex min-w-0 items-baseline gap-1" data-testid={testid} data-address={party.address} title={party.address}>
 		{#if party.label}<span class="font-medium text-foreground">{party.label}</span>{/if}
-		<span class="font-mono">{truncateHex(party.address)}</span>
+		<Address value={party.address} size="xs" mono showCopy={false} />
 	</span>
 {/snippet}
 
@@ -113,7 +117,7 @@
 							{/if}
 
 							<div class="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
-								<span class="font-mono" data-testid="tx-hash" title={row.hash}>{truncateHex(row.hash, {start: 10, end: 8})}</span>
+								<TransactionHash value={row.hash} truncate={{start: 10, end: 8}} size="xs" data-testid="tx-hash" title={row.hash} />
 								<span>{formatTimestamp(row.timestamp)}</span>
 							</div>
 						</Card.Content>
