@@ -1,21 +1,20 @@
 <!--
 	Copied from jolly-roger web/src/routes/contracts/components/ContractFunction.svelte, at
-	commit 8a73e680: the card, the arguments, the error and the read result are that file's.
+	commit a4082a13: the card, the arguments, the error and the read result are that file's.
 	Changed here:
 	- the state and `handleFetch` / `handleExecute` moved to a store,
 	  $lib/playground/contracts/function-call.ts, which this component creates and renders;
 	- the write half is the playground's: no wallet, connection, executor or balance check. A
 	  write is signed with a throwaway test key, from the account the view's picker names
-	  (`from`), and sent to the chain in the tab; the card shows its hash, from whom, the block
-	  and whether it succeeded, instead of a link to jolly-roger's explorer
-	  ($lib/core/ui/ethereum/TransactionHash.svelte, whose imports reach jolly-roger's app layer);
+	  (`from`), and sent to the chain in the tab; the card shows its hash (jolly-roger's
+	  $lib/core/ui/ethereum/TransactionHash.svelte, in full, with no explorer to link to), from
+	  whom, the block and whether it succeeded, instead of a link to jolly-roger's explorer;
 	- `canWrite`, so a write waits while a run uses the chain;
-	- the unused Address import is gone; data-testid attributes for the browser tests;
+	- data-testid attributes for the browser tests;
 	- smaller ones: `min-w-0` and `break-all` so a long signature wraps on a phone; a result is
 	  shown and counted when it is `!== null` (so a `0n` read counts, where the original tested
 	  truthiness); Clear also clears an error alone; an error is summarised by
-	  `callErrorMessage` (the revert reason) rather than shown as `e.message`, and not logged;
-	  the inputs' ids are prefixed with the address and the full signature (overloads differ).
+	  `callErrorMessage` (the revert reason) rather than shown as `e.message`, and not logged.
 -->
 <script lang="ts">
 	import type {AbiFunction} from 'viem';
@@ -33,6 +32,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import TransactionHash from '$lib/core/ui/ethereum/TransactionHash.svelte';
 	import type {ContractTarget} from '$lib/playground/contracts/chain-calls';
 	import type {SigningAccount} from '$lib/playground/contracts/accounts';
 	import {
@@ -141,9 +141,13 @@
 							? 'Transaction mined'
 							: 'Transaction mined, and reverted'} in block {$call.transaction.blockNumber}</span
 					>
-					<span class="font-mono text-xs break-all" data-testid="tx-hash"
-						>{$call.transaction.hash}</span
-					>
+					<TransactionHash
+						value={$call.transaction.hash}
+						truncate={false}
+						size="xs"
+						class="max-w-full break-all"
+						data-testid="tx-hash"
+					/>
 					<span class="text-xs text-muted-foreground"
 						>from {$call.transaction.fromLabel}, gas used {$call.transaction.gasUsed}</span
 					>
