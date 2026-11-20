@@ -2,7 +2,7 @@
 
 A site where you edit Solidity contracts and [rocketh](https://rocketh.dev) deploy scripts in the browser, compile them in the tab, run the real deploy scripts against an EVM in the tab, and download the result as a hardhat-deploy project that runs unchanged with `pnpm i && pnpm hardhat deploy`. Nothing touches a network.
 
-It is meant to live at [play.rocketh.dev](https://play.rocketh.dev). It is being built: the design is the spec [`work/specs/proposed/rocketh-playground.md`](work/specs/proposed/rocketh-playground.md).
+It is meant to live at [play.rocketh.dev](https://play.rocketh.dev). It is being built: the design is the spec [`work/specs/tasked/rocketh-playground.md`](work/specs/tasked/rocketh-playground.md).
 
 ## Where this sits
 

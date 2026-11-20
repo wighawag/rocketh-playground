@@ -30,7 +30,7 @@ This repo is the root of a template tree; other repos derive from it through a `
 
 # rocketh playground (this repository)
 
-This repository is the rocketh playground, made from `template-svelte-shadcn` (the `stem` remote). Its design is the spec `work/specs/proposed/rocketh-playground.md` in this repository; read it before changing anything here, and check it against the rocketh, webevm and template-commit-reveal code it cites rather than trusting it.
+This repository is the rocketh playground, made from `template-svelte-shadcn` (the `stem` remote). Its design is the spec `work/specs/tasked/rocketh-playground.md` in this repository; read it before changing anything here, and check it against the rocketh, webevm and template-commit-reveal code it cites rather than trusting it.
 
 - **Generic changes go to the template first.** A fix or feature that is not specific to the playground is a pull request on `template-svelte-shadcn` (or higher), then comes down through `stem`. Deleting a template file is recorded in `.offshoot-omissions` with its reason.
 - **It runs PUBLISHED rocketh packages**, pinned in `package.json`, never a rocketh checkout: the project a reader exports pins published versions, and the playground must run the same ones.
