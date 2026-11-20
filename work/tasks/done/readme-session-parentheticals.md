@@ -30,3 +30,7 @@ In `web/src/lib/playground/README.md`, the entry "**The page's side is `session.
 > Done means `pnpm verify` is green and that line of `web/src/lib/playground/README.md` is the only change; no test is added.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- I used the wording suggested in the task, which moves the `workers.ts` note next to the workers and makes the database names part of the sentence. The rest of the line is unchanged.
