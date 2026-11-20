@@ -1,0 +1,156 @@
+# Follows rocketh releases: when npm has a newer rocketh, @rocketh/* or hardhat-deploy release than
+# the playground pins, bumps it, runs the tests and the export test on the bump, and opens a pull
+# request a human reviews and merges. Nothing is merged automatically.
+#
+# What is followed and how a version is chosen is decided by `web/scripts/follow-releases.mjs`
+# (tested by `web/test/follow-releases.test.ts`): `rocketh` and every `@rocketh/*` in
+# `web/package.json`, and `hardhat-deploy`, the starting project's release recorded in
+# `web/project-template.json` (refreshed with `web/scripts/update-project-template.mjs`). `webevm`
+# and `viem` are not followed. A run does nothing when nothing is newer, or when the bump branch
+# for the same versions (its name follows from them) already exists on the repository.
+#
+# No personal token and no secret: only the GITHUB_TOKEN every run gets. Opening the pull request
+# with it needs the repository setting "Allow GitHub Actions to create and approve pull requests"
+# (Settings, Actions, General, Workflow permissions). A pull request opened with GITHUB_TOKEN
+# triggers no other workflow, which is why the tests run here, before it is opened.
+#
+# `check` reads only: it bumps, updates the lockfile, runs `pnpm verify` and `pnpm test:export`,
+# and uploads the change it tested as a patch. If a test fails (a bundle budget included), the run
+# fails and no pull request is opened. `pull-request` applies that patch as is, resolving nothing
+# again, so what is pushed is what was tested, and opens the pull request against the branch the
+# run started from.
+#
+# Runs daily, and by hand (Actions, "Follow rocketh releases", "Run workflow").
+
+name: Follow rocketh releases
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+# Nothing at workflow level: each job grants its own scopes.
+permissions: {}
+
+# One run at a time, so two runs never race to push the same bump branch.
+concurrency:
+  group: follow-rocketh-releases
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    outputs:
+      status: ${{ steps.follow.outputs.status }}
+      branch: ${{ steps.follow.outputs.branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job never pushes: the patch it tested goes to `pull-request` as an artifact.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.28.1
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Plain node, no dependency: asks npm, checks `origin` for the bump branch (`git ls-remote`,
+      # which reading suffices for), and applies the bump to the files when there is one.
+      - name: Find newer releases
+        id: follow
+        working-directory: web
+        run: node scripts/follow-releases.mjs --out "$RUNNER_TEMP/follow-releases"
+
+      - name: Update the lockfile
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm install --lockfile-only --ignore-scripts
+
+      # The change, taken before anything is built, so no build output can join it. Only the files
+      # a bump changes are in it.
+      - name: Record the change
+        if: steps.follow.outputs.status == 'bumped'
+        run: |
+          git add -A -- web/package.json pnpm-lock.yaml web/project-template.json web/project-template
+          git diff --cached --binary > "$RUNNER_TEMP/follow-releases/change.patch"
+          git diff --cached --stat
+
+      - name: Install dependencies
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm i --frozen-lockfile --ignore-scripts
+
+      # What `pnpm i` runs as `prepare` when scripts are on: the PWA icons and tags, and
+      # SvelteKit's generated files. Run here on its own, so no dependency's script runs.
+      - name: Prepare
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm --filter ./web run prepare
+
+      - name: Install Chromium for the e2e tests
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm --filter ./web exec playwright install --with-deps chromium
+
+      - name: Verify
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm verify
+
+      - name: Export test
+        if: steps.follow.outputs.status == 'bumped'
+        run: pnpm test:export
+
+      - name: Upload the tested change
+        if: steps.follow.outputs.status == 'bumped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: follow-releases
+          path: ${{ runner.temp }}/follow-releases
+          if-no-files-found: error
+          retention-days: 7
+
+  pull-request:
+    needs: check
+    if: needs.check.outputs.status == 'bumped'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # The commit `check` tested, with the credentials kept: this job pushes the bump branch.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download the tested change
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: follow-releases
+          path: ${{ runner.temp }}/follow-releases
+
+      - name: Push the bump branch
+        env:
+          BRANCH: ${{ needs.check.outputs.branch }}
+          OUT: ${{ runner.temp }}/follow-releases
+        run: |
+          git switch -c "$BRANCH"
+          git apply --index "$OUT/change.patch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --file "$OUT/title.txt"
+          git push origin "HEAD:refs/heads/$BRANCH"
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.check.outputs.branch }}
+          BASE: ${{ github.ref_name }}
+          OUT: ${{ runner.temp }}/follow-releases
+        run: gh pr create --base "$BASE" --head "$BRANCH" --title "$(cat "$OUT/title.txt")" --body-file "$OUT/body.md"
