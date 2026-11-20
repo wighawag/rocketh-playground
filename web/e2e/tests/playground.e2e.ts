@@ -426,6 +426,141 @@ test("Download saves a hardhat-deploy project zip holding the reader's edit, wit
 	await expect(page.getByTestId('download-error')).toBeHidden();
 });
 
+/** A deploy script that says so in the transcript when it runs. */
+const LOUD_SCRIPT = template(DEPLOY).replace('const {deployer} = namedAccounts;', "const {deployer} = namedAccounts;\n\t\tconsole.log('the shared script ran');");
+
+/** Share the project and read the link Share shows. */
+async function share(page: Page): Promise<string> {
+	await page.getByTestId('share').click();
+	const field = page.getByTestId('share-link');
+	await expect(field).toBeVisible();
+	const link = await field.inputValue();
+	await page.keyboard.press('Escape');
+	await expect(page.getByTestId('share-dialog')).toBeHidden();
+	return link;
+}
+
+async function noProjectKeyInURL(page: Page) {
+	await expect.poll(() => new URL(page.url()).hash).not.toContain('project=');
+}
+
+test('Share gives a link that opens the same files in a fresh browser on a chain at block 0, and nothing runs until Deploy', async ({page, browser}) => {
+	expect(LOUD_SCRIPT).toContain("console.log('the shared script ran');");
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await editFile(page, DEPLOY, LOUD_SCRIPT);
+	const link = await share(page);
+	expect(new URL(link).hash).toMatch(/^#project=1\.[A-Za-z0-9_-]+$/);
+
+	// a fresh context: no saved project, so it opens without asking
+	const context = await browser.newContext();
+	const opened = await context.newPage();
+	await opened.goto(link);
+	await expect(opened.locator(TRANSCRIPT)).toContainText('Opened the shared project', {timeout: 60_000});
+	await ready(opened);
+	await expect(opened.getByTestId('link-dialog')).toBeHidden();
+	await expect(opened.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(opened.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(editor(opened)).toHaveAttribute('aria-label', DEPLOY);
+	await expect(editor(opened)).toContainText("console.log('the shared script ran');");
+	await expect(opened.locator(TRANSCRIPT)).not.toContainText('the shared script ran');
+	await expect(opened.getByTestId('last-run')).toBeHidden();
+	await noProjectKeyInURL(opened);
+
+	// the reader edits it; a reload shows their edit, not the link again
+	await editFile(opened, COUNTER, `${template(COUNTER)}\n// edited after opening the link\n`);
+	await expect.poll(() => savedFile(opened, COUNTER)).toContain('// edited after opening the link');
+	await opened.reload();
+	await ready(opened);
+	await expect(opened.locator(TRANSCRIPT)).not.toContainText('Opened the shared project');
+	await opened.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`).click();
+	await expect(editor(opened)).toContainText('// edited after opening the link');
+
+	// Deploy is what runs it
+	await deploy(opened, /^1 transaction sent$/);
+	await expect(opened.locator(TRANSCRIPT)).toContainText('the shared script ran');
+	await context.close();
+});
+
+test("a link over the reader's own project asks first: Cancel keeps it, Open (after a Download) replaces it on a fresh chain", async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await editFile(page, DEPLOY, LOUD_SCRIPT);
+	const link = await share(page);
+	// the reader's own project: deployed, then edited
+	await editFile(page, DEPLOY, template(DEPLOY));
+	await deploy(page, /^1 transaction sent$/);
+	const mine = `${template(COUNTER)}\n// mine\n`;
+	await editFile(page, COUNTER, mine);
+	await expect.poll(() => savedFile(page, COUNTER)).toBe(mine);
+
+	// a new document, not a fragment change within this one
+	await page.goto('about:blank');
+	await page.goto(link);
+	await expect(page.getByTestId('link-dialog')).toBeVisible({timeout: 60_000});
+	await page.getByTestId('link-cancel').click();
+	await expect(page.getByTestId('link-dialog')).toBeHidden();
+	await noProjectKeyInURL(page);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
+	await expect(page.getByTestId('record-files').locator('[data-path="deployments/playground/Counter.json"]')).toBeVisible();
+	await page.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`).click();
+	await expect(editor(page)).toContainText('// mine');
+	await page.locator(`[data-testid="project-files"] [data-path="${DEPLOY}"]`).click();
+	await expect(editor(page)).not.toContainText('the shared script ran');
+
+	await page.goto('about:blank');
+	await page.goto(link);
+	await expect(page.getByTestId('link-dialog')).toBeVisible({timeout: 60_000});
+	const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('link-download').click()]);
+	const zip = unzipSync(new Uint8Array(readFileSync(await download.path())));
+	expect(strFromU8(zip[`rocketh-playground-project/${COUNTER}`])).toContain('// mine');
+	await page.getByTestId('link-open').click();
+	await expect(page.getByTestId('link-dialog')).toBeHidden();
+	await expect(page.locator(TRANSCRIPT)).toContainText('Opened the shared project', {timeout: 60_000});
+	await ready(page);
+	await noProjectKeyInURL(page);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(page.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
+	await expect(editor(page)).toContainText("console.log('the shared script ran');");
+	await page.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`).click();
+	await expect(editor(page)).not.toContainText('// mine');
+	await expect(page.locator(TRANSCRIPT)).not.toContainText('the shared script ran');
+});
+
+test('a corrupted link is reported and loads nothing', async ({page}) => {
+	await page.goto(`${PLAIN_URL}/#project=1.notaproject`);
+	await expect(page.getByTestId('link-error')).toContainText('The shared link could not be opened: it is corrupted or cut short.');
+	await ready(page);
+	await noProjectKeyInURL(page);
+	await expect(page.getByTestId('link-dialog')).toBeHidden();
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
+	await expect(page.locator(TRANSCRIPT)).not.toContainText('Opened the shared project');
+	await expect(page.locator('[data-testid="project-files"] [data-path]')).toHaveCount(4);
+	await expect(editor(page)).toContainText('artifact: artifacts.Counter,');
+});
+
+test('a project too big for a link gets none, and Share offers Download instead', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	// about 47 KB of fragment once deflated (4.7 bits a letter) and base64-encoded
+	let noise = '';
+	let seed = 2463534242;
+	while (noise.length < 60_000) {
+		seed ^= seed << 13;
+		seed ^= seed >>> 17;
+		seed ^= seed << 5;
+		noise += String.fromCharCode(97 + ((seed >>> 0) % 26));
+	}
+	await editFile(page, COUNTER, `${template(COUNTER)}\n// ${noise}\n`);
+	await page.getByTestId('share').click();
+	await expect(page.getByTestId('share-too-big')).toContainText('This project is too big for a link');
+	await expect(page.getByTestId('share-link')).toBeHidden();
+	const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('share-download').click()]);
+	expect(download.suggestedFilename()).toBe('rocketh-playground-project.zip');
+});
+
 test.describe('on a phone', () => {
 	// Pixel 7 without its `defaultBrowserType`, which a describe group cannot set: the viewport,
 	// the touch screen and the mobile user agent are what matter here.

@@ -25,7 +25,8 @@
  * `reset()` is the one action that touches the chain: only while `ready` (phase `resetting`), it
  * ends the runner and the EVM worker, and starts both again `fresh` (a chain at block 0, an empty
  * deployment store, each saved over its database), with the starting project's files saved over
- * the reader's.
+ * the reader's. `open(files)` is the same with a shared link's files in place of the starting
+ * project's: the link's contracts never meet another project's deployments.
  */
 import {writable, type Readable} from 'svelte/store';
 import {wrap, type Endpoint, type Remote} from 'comlink';
@@ -156,6 +157,12 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 	 * block 0 and no records. Only while `ready`; does nothing otherwise (as `deploy` does).
 	 */
 	reset(): Promise<void>;
+	/**
+	 * Open a shared link's files as `reset()` gives the starting project: `files` in place of the
+	 * reader's, saved over them, on a fresh chain at block 0 with no records. Nothing runs until
+	 * Deploy. Only while `ready`; does nothing otherwise.
+	 */
+	open(files: ProjectFiles): Promise<void>;
 	/** The in-tab chain, for the Contracts view's reads, once it has started. */
 	provider(): ChainProvider | undefined;
 	/**
@@ -520,7 +527,11 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		stopped.pending = undefined;
 	}
 
-	async function reset() {
+	/**
+	 * Reset and opening a link: `next` in place of the files, saved over them, a fresh chain and
+	 * no records. `done` is the transcript's line once it has, `failure` what a failure is called.
+	 */
+	async function replaceProject(next: ProjectFiles, done: string, failure: string) {
 		if (state.phase !== 'ready' || !node || !runner) return;
 		set({phase: 'resetting'});
 		try {
@@ -534,15 +545,15 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			node = undefined;
 
 			const previous = state.files;
-			const selected = firstSelected(files);
+			const selected = firstSelected(next);
 			clearTimeout(compileTimer);
-			saved?.reset(files, selected);
-			set({files, selected, records: {}, diagnostics: [], lastRun: undefined, namedAccounts: undefined});
-			// The language service and the artifact types: the starting files, then their compile.
+			saved?.reset(next, selected);
+			set({files: next, selected, records: {}, diagnostics: [], lastRun: undefined, namedAccounts: undefined});
+			// The language service and the artifact types: the new files, then their compile.
 			if (state.languageService.status === 'ready') {
-				const gone = Object.keys(previous).filter((path) => !(path in files));
+				const gone = Object.keys(previous).filter((path) => !(path in next));
 				if (gone.length > 0) await typescript!.removeFiles(gone);
-				await typescript!.setFiles(files);
+				await typescript!.setFiles(next);
 				set((s) => ({artifactTypes: s.artifactTypes + 1}));
 			}
 			void compileInBackground();
@@ -551,13 +562,27 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			await startRunner(true);
 			await saved?.flush();
 			await refreshBlockNumber();
-			say('playground', 'Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone.');
+			say('playground', done);
 			set({phase: 'ready'});
 		} catch (error) {
 			set({phase: 'failed', error: messageOf(error)});
-			say('error', `The playground could not reset: ${messageOf(error)}`);
+			say('error', `${failure}: ${messageOf(error)}`);
 		}
 	}
+
+	const reset = () =>
+		replaceProject(
+			files,
+			'Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone.',
+			'The playground could not reset',
+		);
+
+	const open = (next: ProjectFiles) =>
+		replaceProject(
+			next,
+			'Opened the shared project: its files, a new chain at block 0 and no deployment records. Nothing has run: press Deploy to run its scripts.',
+			'The playground could not open the shared project',
+		);
 
 	function edit(path: string, text: string) {
 		set((s) => ({files: {...s.files, [path]: text}}));
@@ -609,5 +634,5 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		}
 	}
 
-	return {subscribe: store.subscribe, start, deploy, stop, reset, edit, select, provider, transact, languageService, dispose};
+	return {subscribe: store.subscribe, start, deploy, stop, reset, open, edit, select, provider, transact, languageService, dispose};
 }

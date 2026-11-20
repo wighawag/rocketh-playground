@@ -213,6 +213,34 @@ describe('a playground session', () => {
 		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
 	});
 
+	it("opens a link's files as Reset does, on a fresh chain with no records, runs nothing, and a new session starts from them", async () => {
+		const DEPLOY = 'deploy/01_deploy_counter.ts';
+		const session = await started('l');
+		await session.deploy();
+		session.edit('deploy/02_mine.ts', "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n");
+		const linked = {
+			...startingProject(),
+			[DEPLOY]: `${TEMPLATE_FILES[DEPLOY]}\n// from a link\n`,
+			'deploy/00_shared.ts': "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('the shared script ran');\n}, {});\n",
+		};
+		await session.open(linked);
+		const state = get(session);
+		expect(state).toMatchObject({phase: 'ready', blockNumber: 0, records: {}, selected: DEPLOY, diagnostics: []});
+		expect(state.files).toEqual(linked);
+		expect(state.lastRun).toBeUndefined();
+		expect(lines(session).at(-1)).toBe(
+			'[playground] Opened the shared project: its files, a new chain at block 0 and no deployment records. Nothing has run: press Deploy to run its scripts.',
+		);
+		expect(lines(session)).not.toContain('[script] the shared script ran');
+		await session.dispose();
+
+		const reloaded = await started('l');
+		expect(get(reloaded)).toMatchObject({blockNumber: 0, records: {}});
+		expect(get(reloaded).files).toEqual(linked);
+		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		expect(lines(reloaded)).toContain('[script] the shared script ran');
+	});
+
 	it('refuses to reset while a run is in progress, changing nothing', async () => {
 		const session = await started('k');
 		const wait = "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {});\n";

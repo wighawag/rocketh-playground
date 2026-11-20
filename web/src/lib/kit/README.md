@@ -8,6 +8,7 @@ This is not portability theatre. The rule pays for itself immediately, in two wa
 
 - `paths.ts`: where the app is deployed. `resolve()` from `$app/paths` bound as a `PathResolver`, plus the pre-bound `url()` and `createRouteHandler()` the app uses. Everything else takes the resolver as a parameter.
 - `notification-navigation.ts`: following a URL from a push notification, via shallow routing so a running app is not reloaded.
+- `location.ts`: replacing the address bar's URL in place (shallow routing's `replaceState`), which the playground uses to drop a shared link's `project` key once it has been opened or cancelled.
 
 ## How the seam works
 

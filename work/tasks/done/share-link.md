@@ -49,3 +49,15 @@ A Share button writes the project files, compressed with `fflate`, into the URL 
 ### q1: 'task:share-link' was bounced — how should we proceed?
 
 Retry, continuing from the kept branch. The gate failed only because another process held port 4273 when the e2e step started (the check and the unit tests passed); the port is free again. The conductor rebases the kept branch onto main by hand, then re-dispatches. Before Playwright, check ports 4273 and 4274 are free (`ss -ltnp`) and if not set `E2E_GATEWAY_PLAIN_PORT`/`E2E_GATEWAY_SW_PORT` to free ports.
+
+## Decisions
+
+- The fragment value starts with a version marker, `1.`, followed by deflated JSON in base64url without padding. The marker lets a later encoding be told apart; `.` is not a base64url character, and the value has no `=`, `&`, `+` or `/`, so `getHashParamsFromLocation` reads it unchanged. Alternative: no marker. Touches any future link format, and "Open in playground" from rocketh.dev.
+- The 32 KB cap is measured as `project=` plus the value, in characters (the fragment as written), against `SHARE_FRAGMENT_LIMIT = 32 * 1024`.
+- A link's files are checked when decoded. Refused: a value that is not text, a set with no files, an absolute path, a path with a backslash, `.` or `..` segments, and any path under `deployments/`. Paths with `..` would let Download write a zip that escapes its folder, and deployment records belong to the chain, not the project. Alternative: accept any keys. Touches `export-project.ts`, which writes these paths into the zip.
+- "No saved project of the reader's" is judged on the files alone: files equal to the starting project open without asking, even if the reader has deployed them. This follows the answer's own wording ("a first visit, or one that is still the starting project"). Alternative: also ask when there are records.
+- A corrupted link also has its `project` key removed, so a reload does not report it again. If the playground fails to start, the key is kept so a reload can still open the link.
+- The link opens once the session is `ready`, through `session.open()`, which shares `reset()`'s code. The reader therefore briefly sees their own project boot before the link's replaces it. Opening reuses phase `resetting` (the header reads "Resetting...") rather than adding a new `Phase`, which would have touched `canDownload`, the busy flag and `phaseLabel`. The transcript has its own line: "Opened the shared project: ... Nothing has run: press Deploy to run its scripts."
+- The URL is rewritten with SvelteKit's `replaceState` from `$app/navigation` (in `kit/location.ts`, passing `page.state` through as `openFromNotification` does), rather than calling `history.replaceState` directly. SvelteKit warns against calling `history.replaceState` directly because it fights its router.
+- The shared link is the page's current URL, path and query included, with its fragment replaced by `project=...`. Other fragment keys of the sharer's page are not carried into the link. Share is enabled when Download is (`canShare = canDownload`).
+- Escape or clicking outside the confirmation counts as Cancel.
