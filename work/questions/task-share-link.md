@@ -30,3 +30,4 @@
 <!-- q1 fields: id=q1 kind=stuck -->
 
 **Your answer** (write below this line):
+Retry, continuing from the kept branch. The gate failed only because another process held port 4273 when the e2e step started (the check and the unit tests passed); the port is free again. The conductor rebases the kept branch onto main by hand, then re-dispatches. Before Playwright, check ports 4273 and 4274 are free (`ss -ltnp`) and if not set `E2E_GATEWAY_PLAIN_PORT`/`E2E_GATEWAY_SW_PORT` to free ports.
