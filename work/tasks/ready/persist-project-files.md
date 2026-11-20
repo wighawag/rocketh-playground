@@ -4,7 +4,7 @@ slug: persist-project-files
 spec: rocketh-playground
 blockedBy: []
 covers: [11]
-needsAnswers: true
+needsAnswers: false
 ---
 
 ## What to build
@@ -41,3 +41,9 @@ Today a reload restores the chain and the deployment records (each in IndexedDB)
 ### q1: 'task:persist-project-files' was bounced — how should we proceed?
 
 Retry, continuing from the kept branch. The gate failed in the fresh worktree on a pre-existing race, not on this task's code: in a clean tree `web/static/solc/` has no soljson, so several vitest workers call `ensureSoljson` (`web/scripts/soljson.mjs`) at once, each fetches and rewrites the file with `writeFileSync`, and one worker's `loadSoljson` reads it while another is rewriting it (the SyntaxError in `test/lib/playground/helpers.ts`, seen from `workers.test.ts`). Keep the persist work as it is and also fix the race: make `ensureSoljson` write atomically (write to a unique temporary file in `static/solc/`, then `renameSync` it over the final path), with a comment saying why. Record it in the Decisions block. Check that `pnpm verify` passes from a tree with no `web/static/solc/`.
+
+## Applied answers 2026-11-20
+
+### q1: 'task:persist-project-files' was bounced — how should we proceed?
+
+Retry, continuing from the kept branch: the conflict is only the branch's done-move of the task file against the answer applied on main. The conductor rebases the branch onto main by hand, keeping main's task body (with its applied answers) and the branch's Decisions block, then re-dispatches. The instruction of the previous answer still stands: keep the persist work and make `ensureSoljson` write atomically (temporary file, then rename), so `pnpm verify` passes from a tree with no `web/static/solc/`.
