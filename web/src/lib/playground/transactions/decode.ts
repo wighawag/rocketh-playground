@@ -2,7 +2,7 @@
  * One transaction of the in-tab chain, as the Transactions view shows it: decoded with the
  * deployment records' ABIs.
  *
- * The decoding is jolly-roger's, copied at its paths (8a73e680): `decodeTransaction` and
+ * The decoding is jolly-roger's, copied at its paths (a4082a13): `decodeTransaction` and
  * `loadTransactionItemData` (`src/routes/explorer/lib/services/`) for the call and a revert's
  * reason, `decodeLogs` (`src/routes/explorer/lib/utils.ts`) for the events. What differs in the
  * playground lives here:
@@ -13,13 +13,14 @@
  *   arguments decoded from the record's `argsData`), found by the record's `transaction.hash`, or
  *   by the receipt's `contractAddress` for a record that does not name its transaction. The copy
  *   only says "Contract Creation";
- * - THE ARGUMENTS are named and typed from the ABI item: the copy's `formatDecodedArgs` prints
- *   positional values with each number quoted (`toPlainJson` turns a bigint into a string), so
- *   `incBy(5)` would read `("5")`;
+ * - THE ARGUMENTS are kept as a list of name, type and value, for the view and its tests: a
+ *   call's are named from the inputs the copy keeps (the ABI item its selector names, exact for
+ *   overloads), and printed as the copy's `formatDecodedArgs` prints them; a constructor's and an
+ *   event's, which the copy shows as JSON, from the ABI item found by name and arity;
  * - WHO: `from` is labelled with the named account (`../contracts/accounts.ts`), `to` with the
  *   deployment's name;
- * - A TRANSACTION TO AN ADDRESS NO RECORD KNOWS is shown undecoded, with its selector: the copy's
- *   `formatDecodedTransaction` would call it a "Transfer".
+ * - A TRANSFER names its recipient's label ("Transfer to Counter"); an undecoded call is titled
+ *   and given its selector as the copy's `formatDecodedTransaction` does.
  *
  * WHICH RECORD DECODES AN ADDRESS: the records as they are now. A redeploy rewrites a record
  * with the new address, so an older transaction to the old address is decoded only while some
@@ -34,7 +35,12 @@
  * "Missing or invalid parameters" (webevm's -32000, its explanation left in the error's cause).
  */
 import {decodeAbiParameters, type Abi, type AbiParameter, type PublicClient, type Transaction, type TransactionReceipt} from 'viem';
-import {decodeTransaction, formatDecodedError, type DecodedTransactionData} from '../../../routes/explorer/lib/services/transactionDecoder.js';
+import {
+	decodeTransaction,
+	formatDecodedError,
+	formatDecodedTransaction,
+	type DecodedTransactionData,
+} from '../../../routes/explorer/lib/services/transactionDecoder.js';
 import {loadTransactionItemData} from '../../../routes/explorer/lib/services/transactionItem.js';
 import {decodeLogs, type DecodingContracts} from '../../../routes/explorer/lib/utils.js';
 import {toPlainJson} from '../../core/utils/format/index.js';
@@ -145,17 +151,15 @@ function buildRow(raw: RawTransaction, decoded: DecodedTransactionData, context:
 		row.title = 'Contract creation';
 	} else if (decoded.isDecoded && decoded.functionName) {
 		row.kind = 'call';
-		row.title = `${decoded.contractName}.${decoded.functionName}`;
-		const abi = contracts.find((c) => c.name === decoded.contractName)?.abi ?? [];
-		row.args = namedArgs(abiInputs(abi, 'function', decoded.functionName, decoded.args), decoded.args);
+		row.title = formatDecodedTransaction(decoded).methodLabel;
+		row.args = namedArgs(decoded.inputs ?? [], decoded.args);
 	} else if (tx.input === '0x' || tx.input === '0x0') {
 		row.kind = 'transfer';
 		row.title = row.to?.label ? `Transfer to ${row.to.label}` : 'Transfer';
 	} else {
 		row.kind = 'undecoded';
-		const known = contracts.find((c) => same(c.address, tx.to));
-		row.title = known ? `A call ${known.name}'s ABI does not decode` : 'Call to an unknown contract';
-		row.selector = tx.input.slice(0, 10) as `0x${string}`;
+		row.title = formatDecodedTransaction(decoded).methodLabel;
+		row.selector = decoded.selector;
 	}
 
 	if (receipt) {
@@ -199,8 +203,8 @@ function constructorArgs(contract: DeployedContract): DecodedArg[] | undefined {
 	}
 }
 
-/** The inputs of the ABI item a decoded name and its arguments came from (overloads by arity). */
-function abiInputs(abi: Abi, type: 'function' | 'event', name: string, args: unknown): readonly AbiParameter[] {
+/** The inputs of the event a decoded name and its arguments came from (overloads by arity). */
+function abiInputs(abi: Abi, type: 'event', name: string, args: unknown): readonly AbiParameter[] {
 	const count = Array.isArray(args) ? args.length : args && typeof args === 'object' ? Object.keys(args).length : 0;
 	const items = abi.filter((item) => item.type === type && item.name === name) as {inputs: readonly AbiParameter[]}[];
 	return (items.find((item) => item.inputs.length === count) ?? items[0])?.inputs ?? [];
