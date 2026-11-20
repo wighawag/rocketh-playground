@@ -9,3 +9,4 @@
 <!-- q1 fields: id=q1 kind=stuck -->
 
 **Your answer** (write below this line):
+Retry, continuing from the kept branch: the conflict is only the branch's done-move of the task file against the answer applied on main. The conductor rebases the branch onto main by hand, keeping main's task body (with its applied answers) and the branch's Decisions block, then re-dispatches. The instruction of the previous answer still stands: keep the persist work and make `ensureSoljson` write atomically (temporary file, then rename), so `pnpm verify` passes from a tree with no `web/static/solc/`.
