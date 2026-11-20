@@ -20,9 +20,15 @@ import {
 } from './core/utils/web/url';
 import {createRouteHandler, resolvePath} from './kit/paths';
 import {openFromNotification} from './kit/notification-navigation';
+import {replaceLocation} from './kit/location';
 import solc from '../../solc.json';
 import {createPlaygroundSession} from './playground/session';
 import {browserWorkers} from './playground/workers';
+import {createLinkOpener} from './playground/project/open-link';
+import {
+	SHARE_KEY,
+	withoutFragmentKey,
+} from './playground/project/link-fragment';
 
 /**
  * The notifications service is generic: a notification is just a title/body/
@@ -81,3 +87,18 @@ export function createPlayground() {
 	});
 }
 export const SOLC_VERSION = solc.version;
+
+/**
+ * The shared link this page was opened with, if any: the fragment's `project` key, read once
+ * (`hashParams`, above). Its key is dropped from the URL once the link has been dealt with.
+ */
+export function openSharedLink(
+	session: ReturnType<typeof createPlayground>,
+) {
+	return createLinkOpener({
+		session,
+		value: hashParams[SHARE_KEY],
+		removeFromURL: () =>
+			replaceLocation(withoutFragmentKey(location.href, SHARE_KEY)),
+	});
+}

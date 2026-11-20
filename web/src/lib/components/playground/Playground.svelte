@@ -4,16 +4,21 @@
 	import type {PlaygroundSession} from '$lib/playground/session';
 	import {compilerLabel, lastRunLabel, phaseLabel} from '$lib/playground/format';
 	import {canDownload, createProjectDownload} from '$lib/playground/project/download';
+	import {canShare, createProjectShare, tooBigLabel} from '$lib/playground/project/share';
+	import type {LinkOpener} from '$lib/playground/project/open-link';
 	import FileList from './FileList.svelte';
 	import FileView from './FileView.svelte';
 	import Transcript from './Transcript.svelte';
 
-	let {session, solcVersion}: {session: PlaygroundSession; solcVersion: string} = $props();
+	let {session, link, solcVersion}: {session: PlaygroundSession; link: LinkOpener; solcVersion: string} = $props();
 	const busy = $derived(
 		$session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running' || $session.phase === 'sending' || $session.phase === 'resetting',
 	);
 	// Download builds the zip on demand: fflate loads on the first press.
 	const projectDownload = createProjectDownload();
+	// Share encodes on demand too: fflate loads on the first press.
+	const projectShare = createProjectShare();
+	const sharing = $derived($projectShare.status === 'shared' || $projectShare.status === 'too-big' || $projectShare.status === 'failed');
 	/** Whether the Reset confirmation is open. */
 	let confirmingReset = $state(false);
 	function confirmReset() {
@@ -27,6 +32,13 @@
 	let contract = $state<string | undefined>();
 	/** Whether the centre pane shows the chain's transactions. */
 	let transactions = $state(false);
+	// the views show the chain a shared link replaces
+	$effect(() => {
+		if ($link.status === 'opening') {
+			contract = undefined;
+			transactions = false;
+		}
+	});
 	// Loaded on first use: it brings viem's ABI and signing code, which a first visit does not need.
 	const loadContracts = () => import('./Contracts.svelte');
 	// Loaded on first use too: viem's client and the decoders.
@@ -45,8 +57,20 @@
 			onclick={() => projectDownload.download($session.files)}
 			disabled={!canDownload($session.phase) || $projectDownload.status === 'building'}>Download</Button
 		>
+		<Button
+			data-testid="share"
+			variant="outline"
+			onclick={() => projectShare.share($session.files)}
+			disabled={!canShare($session.phase) || $projectShare.status === 'building'}>Share</Button
+		>
 		{#if $projectDownload.status === 'failed'}
 			<span data-testid="download-error" class="text-sm text-red-400">The download failed: {$projectDownload.error}</span>
+		{/if}
+		{#if $link.status === 'invalid' || $link.status === 'failed'}
+			<span data-testid="link-error" class="text-sm text-red-400">
+				The shared link could not be opened: {$link.error}. Nothing was loaded from it.
+				<button class="underline" onclick={() => link.dismiss()}>Dismiss</button>
+			</span>
 		{/if}
 		<span data-testid="phase" data-phase={$session.phase} class="text-sm">
 			{phaseLabel($session.phase)}{#if busy}...{/if}
@@ -122,6 +146,49 @@
 			<Dialog.Footer>
 				<Button data-testid="reset-cancel" variant="outline" onclick={() => (confirmingReset = false)}>Cancel</Button>
 				<Button data-testid="reset-confirm" variant="destructive" onclick={confirmReset} disabled={$session.phase !== 'ready'}>Reset</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root open={sharing} onOpenChange={(open) => !open && projectShare.close()}>
+		<Dialog.Content data-testid="share-dialog">
+			{#if $projectShare.status === 'shared'}
+				<Dialog.Header>
+					<Dialog.Title>Share this project</Dialog.Title>
+					<Dialog.Description data-testid="share-copied">
+						{$projectShare.copied ? 'The link is copied to the clipboard.' : 'Copy the link below.'} The files are in the link itself, after the #, which is never sent to a server. Opening it runs nothing until Deploy is pressed.
+					</Dialog.Description>
+				</Dialog.Header>
+				<input data-testid="share-link" readonly value={$projectShare.link} class="w-full rounded border bg-transparent px-2 py-1 font-mono text-xs" onfocus={(e) => e.currentTarget.select()} />
+			{:else if $projectShare.status === 'too-big'}
+				<Dialog.Header>
+					<Dialog.Title>Too big for a link</Dialog.Title>
+					<Dialog.Description data-testid="share-too-big">{tooBigLabel($projectShare.length)}</Dialog.Description>
+				</Dialog.Header>
+				<Dialog.Footer>
+					<Button data-testid="share-download" onclick={() => projectDownload.download($session.files)} disabled={$projectDownload.status === 'building'}>Download</Button>
+				</Dialog.Footer>
+			{:else if $projectShare.status === 'failed'}
+				<Dialog.Header>
+					<Dialog.Title>Share failed</Dialog.Title>
+					<Dialog.Description data-testid="share-error">{$projectShare.error}</Dialog.Description>
+				</Dialog.Header>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root open={$link.status === 'confirm'} onOpenChange={(open) => !open && link.cancel()}>
+		<Dialog.Content data-testid="link-dialog">
+			<Dialog.Header>
+				<Dialog.Title>Open the shared project?</Dialog.Title>
+				<Dialog.Description>
+					This link holds a project. Opening it replaces your files, the chain in this tab and the deployment records, here and in this browser's storage. Download your project first to keep a copy. Nothing in the link runs until you press Deploy.
+				</Dialog.Description>
+			</Dialog.Header>
+			<Dialog.Footer>
+				<Button data-testid="link-download" variant="outline" onclick={() => projectDownload.download($session.files)} disabled={$projectDownload.status === 'building'}>Download</Button>
+				<Button data-testid="link-cancel" variant="outline" onclick={() => link.cancel()}>Cancel</Button>
+				<Button data-testid="link-open" variant="destructive" onclick={() => link.confirm()} disabled={$session.phase !== 'ready'}>Open</Button>
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>
