@@ -74,7 +74,37 @@ describe('the environment', () => {
 	};
 
 	it('is a reader shell: nothing pnpm or vitest adds to the test run', () => {
-		expect(readerEnv(parent)).toEqual({PATH: '/usr/bin', HOME: '/home/reader'});
+		expect(readerEnv(parent, '/repo')).toEqual({
+			PATH: '/usr/bin',
+			HOME: '/home/reader',
+		});
+	});
+
+	it("keeps a pnpm installed outside the repository, as GitHub's runners have it, and drops the repository's own binaries", () => {
+		// `pnpm/action-setup` puts pnpm in a `node_modules/.bin` of its own, outside the checkout
+		const runner = {
+			PATH: [
+				'/home/runner/work/rocketh-playground/rocketh-playground/web/node_modules/.bin',
+				'/home/runner/work/rocketh-playground/rocketh-playground/node_modules/.bin',
+				'/home/runner/work/rocketh-playground/rocketh-playground/web/node_modules/.pnpm/node_modules/.bin',
+				'/home/runner/setup-pnpm/node_modules/.bin',
+				'/opt/hostedtoolcache/node/24.0.0/x64/bin',
+				'/usr/bin',
+			].join(':'),
+			PNPM_HOME: '/home/runner/setup-pnpm/node_modules/.bin',
+		};
+		expect(
+			readerEnv(runner, '/home/runner/work/rocketh-playground/rocketh-playground')
+				.PATH,
+		).toBe(
+			'/home/runner/setup-pnpm/node_modules/.bin:/opt/hostedtoolcache/node/24.0.0/x64/bin:/usr/bin',
+		);
+	});
+
+	it('does not take a folder beside the repository for one inside it', () => {
+		expect(
+			readerEnv({PATH: '/repo-other/node_modules/.bin:/repo/bin'}, '/repo').PATH,
+		).toBe('/repo-other/node_modules/.bin');
 	});
 
 	it('puts the pnpm store and every XDG folder inside the temporary folder', () => {

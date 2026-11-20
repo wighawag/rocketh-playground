@@ -83,7 +83,15 @@ async function started(db: string) {
 
 const lines = (session: PlaygroundSession) => get(session).transcript.map((l) => `[${l.source}] ${l.text}`);
 
-describe('a playground session', () => {
+/**
+ * Every test here boots a whole session: the compiler (soljson), TypeScript with the project's
+ * declarations, the EVM node and the runner. That takes a few seconds on a developer machine but
+ * more than vitest's default 5 s on a cold CI runner (GitHub's timed out on the first one), so the
+ * tests here get a limit fit for that machine, stated once.
+ */
+const SESSION_TEST_TIMEOUT = 60_000;
+
+describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 	it('boots, deploys the starting project, and shows its records', async () => {
 		const session = await started('a');
 		const booted = get(session);

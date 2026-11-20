@@ -37,3 +37,9 @@ Run `pnpm verify` with `CI=true` set (as on GitHub, which also turns on Playwrig
 > Done means `pnpm verify` (from the repository root) is green, also with `CI=true`, with the new tests in it.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- "Inside the repository" means "at or under the repository root once resolved", not a fixed list of `.bin` folders. It covers the root's and `web/`'s `node_modules/.bin`, the `.pnpm` bins, and pnpm's relative `./node_modules/.bin`. Empty and relative entries are resolved against the test's working directory, which is inside the repository, so they are dropped too, as they were before. Alternative: list the two `.bin` folders by name, which would miss the `.pnpm` and relative ones. Touches only `pnpm test:export` and its offline unit tests.
+- `readerEnv` takes the repository root as an optional second parameter, which defaults to the root computed from the file's location. This lets the unit test describe a runner's layout without depending on where the checkout actually is. Alternative: read the root from an environment variable, which a reader's shell does not have.
+- The session timeout is 60 s, set at the describe level. That is about ten times what a developer machine needs, and still finishes a genuine hang well within the workflow's 90-minute `timeout-minutes`. Hook timeouts stay at vitest's default, because disposing a session does not boot anything.
