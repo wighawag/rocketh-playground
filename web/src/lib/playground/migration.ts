@@ -13,7 +13,12 @@
  *   that only imports types fails on the next shape instead;
  * - a TypeError reading v1's `hre` API off rocketh's environment: `getNamedAccounts`,
  *   `getUnnamedAccounts`, `getChainId` or `deployments` named in the message
- *   (`getNamedAccounts is not a function`, `hre.deployments.deploy is not a function`).
+ *   (`getNamedAccounts is not a function`, `hre.deployments.deploy is not a function`);
+ * - the runner's own error that a script `has no default export made with deployScript(...)`, as a
+ *   v1 `module.exports = async (hre) => {...}` script fails before rocketh runs it. That error is
+ *   also what a v2 script that forgot `deployScript` gets, so it counts only when the script's text
+ *   (from the project files the session ran, keyed by the path the message starts with) is shaped
+ *   like v1: it names `hre`, `HardhatRuntimeEnvironment` or v1's `hre` API.
  */
 import type {RunError} from './runner/run.js';
 
@@ -33,11 +38,22 @@ const REFUSED_IMPORT = / imports "([^"]+)", which the playground cannot provide/
 
 const V1_HRE_API = /\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
 
-export function looksLikeV1Script(error: Pick<RunError, 'name' | 'message'>): boolean {
+/** The runner's error for a script whose default export is not a function (`runner/run.ts`). */
+const NO_DEFAULT_EXPORT = /^(.+) has no default export made with deployScript\(\.\.\.\)$/;
+
+const V1_SHAPED_SCRIPT = /\bhre\b|\bHardhatRuntimeEnvironment\b|\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
+
+/** `files` are the project's sources by path, as the session ran them; only the third shape reads them. */
+export function looksLikeV1Script(error: Pick<RunError, 'name' | 'message'>, files: Readonly<Record<string, string>> = {}): boolean {
 	if (error.name === 'UnsupportedImportError') {
 		const specifier = REFUSED_IMPORT.exec(error.message)?.[1];
 		return specifier !== undefined && V1_ONLY_MODULE.test(specifier);
 	}
 	if (error.name === 'TypeError') return V1_HRE_API.test(error.message);
+	if (error.name === 'Error') {
+		const path = NO_DEFAULT_EXPORT.exec(error.message)?.[1];
+		const script = path === undefined ? undefined : files[path];
+		return script !== undefined && V1_SHAPED_SCRIPT.test(script);
+	}
 	return false;
 }

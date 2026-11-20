@@ -32,3 +32,8 @@ covers: [5]
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- Which scripts count as "shaped like v1": the text names `hre`, `HardhatRuntimeEnvironment`, or one of v1's `hre` API names (`getNamedAccounts`, `getUnnamedAccounts`, `getChainId`, `deployments`), matched as whole words. That is the same list the TypeError shape already uses, plus `hre`. The task gave this only as an example. I left out `DeployFunction` and the `hardhat-deploy` import text: a script importing those types nearly always also takes `hre`. Another option was to look for `module.exports` itself, but a v2 script could use that form too, so it would not separate the two cases. This touches only the hint.
+- `looksLikeV1Script` takes the files as an optional second argument (default `{}`), so the existing one-argument calls keep working. With no files, the third shape is never recognised, so the hint is never added on a guess. The session passes the source files it compiled and transpiled. Those are keyed by the same paths the runner reports, so no path translation is needed.

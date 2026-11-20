@@ -185,6 +185,28 @@ test("a hardhat-deploy v1 deploy script fails with rocketh's error, then a line 
 	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
 });
 
+test("a v1 module.exports script fails with the playground's no-default-export error, then the migration guide line", async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await editFile(
+		page,
+		DEPLOY,
+		[
+			'module.exports = async (hre: any) => {',
+			'const {deployments, getNamedAccounts} = hre;',
+			'const {deployer} = await getNamedAccounts();',
+			"await deployments.deploy('Counter', {from: deployer, log: true});",
+			'};',
+		].join('\n'),
+	);
+	await deploy(page, /^The run failed$/);
+	const lines = page.locator(`${TRANSCRIPT} li`);
+	await expect(lines.nth(-2)).toHaveText(`${DEPLOY} has no default export made with deployScript(...)`);
+	await expect(lines.nth(-1)).toContainText('This looks like a hardhat-deploy v1 deploy script');
+	await expect(lines.nth(-1).getByTestId('transcript-link')).toHaveAttribute('href', 'https://rocketh.dev/hardhat-deploy/migration/');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+});
+
 test('a Solidity error is shown with its file and line, and nothing is sent', async ({page}) => {
 	await page.goto(PLAIN_URL);
 	await ready(page);
