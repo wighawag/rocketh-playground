@@ -1,8 +1,7 @@
-// Copied from jolly-roger web/test/routes/explorer/decoding-display.test.ts, at commit a4082a13; nothing below this line is changed.
+// Copied from jolly-roger web/test/routes/explorer/decoding-display.test.ts, at commit a4082a13; changed only in this opening comment.
 // What the explorer shows for a transaction it decodes: a refused replay's
-// reason (P1-8), an undecoded call's label (P1-9), and the call's arguments
-// (P1-10). The existing cases of transactionDecoder.test.ts are kept as they
-// were, as the oracle.
+// reason, an undecoded call's label, and the call's arguments. The existing
+// cases of transactionDecoder.test.ts are kept as they were, as the oracle.
 import {describe, it, expect} from 'vitest';
 import {
 	CallExecutionError,
