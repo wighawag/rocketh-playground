@@ -71,6 +71,7 @@
 		"format:check": "prettier --check .",
 		"serve": "ipfs-emulator --only -d build -p 8080",
 		"e2e": "playwright test",
+		"budgets": "node scripts/bundle-budgets.mjs",
 		"test:e2e": "pnpm build && pnpm e2e",
 		"test:e2e:headed": "playwright test --headed"
 	}
