@@ -36,3 +36,13 @@ After merge (maintainer, not the build): run by hand on a branch with an outdate
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- A rocketh package pinned with a range (for example `^0.26.4`) makes the script stop with an error instead of being skipped or turned into an exact pin. The playground runs one version and the export pins it, so a range there is a mistake and the failed run tells the maintainer. Alternatives: skip the package, or quietly pin it exactly. Touches only `follow-releases.mjs` and the workflow's `check` job.
+- Branch name format: `follow-releases/<name>-<version>` per bumped package, sorted by package name, with `@rocketh/core` written `rocketh-core` and parts joined by `-`. If the name would be longer than 200 characters (most packages bumping at once), it becomes `follow-releases/<count>-packages-<16 hex chars of sha256 of the versions>`, which is still unique per set of versions. This keeps names readable and inside git's ref length limit. Alternative: always use a hash, which is unreadable.
+- An existing branch for the same versions counts as "already handled" even if its pull request was closed. That is how the task asked for the check to work (`git ls-remote` only, so read access is enough). A maintainer who wants a bump opened again deletes the branch.
+- The patch is limited to `web/package.json`, `pnpm-lock.yaml`, `web/project-template.json` and `web/project-template/`, and is recorded right after the lockfile update, before the build. No build output can get into the pull request, and `verify` and `test:export` then run on exactly that tree.
+- The `pull-request` job checks out `github.sha` (the commit `check` tested), applies the patch with `git apply --index`, commits as `github-actions[bot]` and opens the pull request with `gh pr create` against `github.ref_name`. If the branch appeared in the meantime, the push fails. A `concurrency` group lets only one run go at a time.
+- The schedule is `17 5 * * *` (05:17 UTC daily), away from the top of the hour when GitHub's scheduled runs crowd. The `check` job has a 90-minute timeout because the export test can take minutes.
+- Versions are compared as `major.minor.patch` numbers in the script itself, without adding a semver dependency (the spec's Decisions approve none for this). Build metadata (`+x`) is allowed; anything with a prerelease identifier is never taken.
