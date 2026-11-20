@@ -6,6 +6,7 @@
 	import {canDownload, createProjectDownload} from '$lib/playground/project/download';
 	import {canShare, createProjectShare, tooBigLabel} from '$lib/playground/project/share';
 	import type {LinkOpener} from '$lib/playground/project/open-link';
+	import {MIGRATION_GUIDE_URL} from '$lib/playground/migration';
 	import FileList from './FileList.svelte';
 	import FileView from './FileView.svelte';
 	import Transcript from './Transcript.svelte';
@@ -79,6 +80,7 @@
 			<span data-testid="last-run" class="text-sm text-muted-foreground">{lastRunLabel($session.lastRun)}</span>
 		{/if}
 		<span class="ml-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
+			<a data-testid="migration-guide" class="underline" href={MIGRATION_GUIDE_URL} target="_blank" rel="noopener noreferrer">Migrating from hardhat-deploy v1?</a>
 			<span data-testid="compiler" data-status={$session.compiler.status}>{compilerLabel($session.compiler, solcVersion)}</span>
 			{#if $session.typescriptVersion}<span>TypeScript {$session.typescriptVersion}</span>{/if}
 			{#if $session.blockNumber !== undefined}<span data-testid="block">chain at block {$session.blockNumber}</span>{/if}

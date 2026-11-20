@@ -152,6 +152,39 @@ test('a script touching the page gets a ReferenceError, and nothing is sent', as
 	expect(await page.title()).not.toBe('from a script');
 });
 
+test("a hardhat-deploy v1 deploy script fails with rocketh's error, then a line linking the migration guide, which the header links too", async ({page}) => {
+	const GUIDE = 'https://rocketh.dev/hardhat-deploy/migration/';
+	await page.goto(PLAIN_URL);
+	await expect(page.getByTestId('migration-guide')).toHaveAttribute('href', GUIDE);
+	await expect(page.getByTestId('migration-guide')).toHaveAttribute('target', '_blank');
+	await ready(page);
+	await expect(page.getByTestId('migration-guide')).toHaveText('Migrating from hardhat-deploy v1?');
+	await editFile(
+		page,
+		DEPLOY,
+		[
+			"import {HardhatRuntimeEnvironment} from 'hardhat/types';",
+			"import {DeployFunction} from 'hardhat-deploy/types';",
+			'',
+			'const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {',
+			'const {deployments, getNamedAccounts} = hre;',
+			'const {deploy} = deployments;',
+			'const {deployer} = await getNamedAccounts();',
+			"await deploy('Counter', {from: deployer, log: true});",
+			'};',
+			'export default func;',
+			"func.tags = ['Counter'];",
+		].join('\n'),
+	);
+	await deploy(page, /^The run failed$/);
+	const lines = page.locator(`${TRANSCRIPT} li`);
+	await expect(lines.nth(-2)).toHaveText('getNamedAccounts is not a function');
+	await expect(lines.nth(-1)).toContainText('This looks like a hardhat-deploy v1 deploy script');
+	await expect(lines.nth(-1).getByTestId('transcript-link')).toHaveAttribute('href', GUIDE);
+	await expect(lines.nth(-1).getByTestId('transcript-link')).toHaveAttribute('target', '_blank');
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+});
+
 test('a Solidity error is shown with its file and line, and nothing is sent', async ({page}) => {
 	await page.goto(PLAIN_URL);
 	await ready(page);

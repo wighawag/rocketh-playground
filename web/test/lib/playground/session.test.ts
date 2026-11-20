@@ -16,6 +16,7 @@ import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
 import {createPlaygroundSession, type PlaygroundSession, type PlaygroundWorkers, type WorkerLike} from '../../../src/lib/playground/session.js';
 import {startingProject, TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
 import {TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
+import {MIGRATION_GUIDE_URL, V1_SCRIPT_HINT} from '../../../src/lib/playground/migration.js';
 import {contractsFromRecords} from '../../../src/lib/playground/contracts/records.js';
 import {writeFunction} from '../../../src/lib/playground/contracts/chain-calls.js';
 import {collectDeclarations} from '../../../scripts/declarations.mjs';
@@ -122,6 +123,24 @@ describe('a playground session', () => {
 		const run = await session.deploy();
 		expect(run).toMatchObject({outcome: 'failed', stage: 'transpile', sent: 0});
 		expect(lines(session).some((l) => l.startsWith('[error] deploy/01_deploy_counter.ts:15:'))).toBe(true);
+	});
+
+	it("points a v1-style deploy script to the migration guide, after rocketh's own error, and an ordinary error to nothing", async () => {
+		const session = await started('v1');
+		const DEPLOY = 'deploy/01_deploy_counter.ts';
+		session.edit(
+			DEPLOY,
+			"import {DeployFunction} from 'hardhat-deploy/types';\n\nconst func: DeployFunction = async function ({deployments, getNamedAccounts}) {\n\tconst {deployer} = await getNamedAccounts();\n\tawait deployments.deploy('Counter', {from: deployer});\n};\nexport default func;\n",
+		);
+		expect(await session.deploy()).toMatchObject({outcome: 'failed', stage: 'run', sent: 0});
+		const transcript = get(session).transcript;
+		expect(transcript.at(-2)).toMatchObject({source: 'error', text: 'getNamedAccounts is not a function'});
+		expect(transcript.at(-1)).toMatchObject({source: 'playground', text: V1_SCRIPT_HINT, link: {href: MIGRATION_GUIDE_URL}});
+
+		session.edit(DEPLOY, "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tthrow new Error('failed on purpose');\n}, {});\n");
+		expect(await session.deploy()).toMatchObject({outcome: 'failed', stage: 'run'});
+		expect(get(session).transcript.at(-1)).toMatchObject({source: 'error', text: 'failed on purpose'});
+		expect(get(session).transcript.filter((l) => l.link)).toHaveLength(1);
 	});
 
 	it('restores the chain and the records in a new session, which then sends nothing', async () => {
