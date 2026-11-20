@@ -21,4 +21,4 @@ The playground's core: what turns the project's files into a run of its deploy s
 - **rocketh's transcript** needs a `named-logs` factory installed before any rocketh module is evaluated: `runner/log-hook.ts`, the runner's first import.
 - **The starting project** is `web/project-template/`, the published hardhat-deploy template, unedited (`project/template.ts`, refreshed by `scripts/update-project-template.mjs`). **The compiler** is the soljson pinned in `web/solc.json`, copied into `static/solc/` by `scripts/soljson.mjs`.
 
-Design: `work/specs/proposed/rocketh-playground.md` in the rocketh repository, and the runner spike, `docs/spikes/runner/` on branch `spike/runner`.
+Design: `work/specs/tasked/rocketh-playground.md` (remaining work in `work/tasks/`), and the runner spike, `docs/spikes/runner/` on branch `spike/runner`.
