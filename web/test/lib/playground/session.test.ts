@@ -14,7 +14,7 @@ import {exposeTypeScript} from '../../../src/lib/playground/typescript/typescrip
 import {exposeEVMNode} from '../../../src/lib/playground/evm/evm-host.js';
 import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
 import {createPlaygroundSession, type PlaygroundSession, type PlaygroundWorkers, type WorkerLike} from '../../../src/lib/playground/session.js';
-import {TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
+import {startingProject, TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
 import {TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
 import {contractsFromRecords} from '../../../src/lib/playground/contracts/records.js';
 import {writeFunction} from '../../../src/lib/playground/contracts/chain-calls.js';
@@ -73,6 +73,7 @@ async function started(db: string) {
 		compilerBytes: COMPILER_BYTES,
 		chainDB: `${db}-chain`,
 		deploymentsDB: `${db}-records`,
+		filesDB: `${db}-files`,
 	});
 	sessions.push(session);
 	await session.start();
@@ -133,6 +134,36 @@ describe('a playground session', () => {
 		expect(get(reloaded).blockNumber).toBe(1);
 		expect(JSON.parse(get(reloaded).records['deployments/playground/Counter.json']).address).toBe(address);
 		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 0});
+	});
+
+	it('starts a new session from the files and the selection saved by the last one, typed and compiled from them', async () => {
+		const DEPLOY = 'deploy/01_deploy_counter.ts';
+		const COUNTER = 'contracts/Counter.sol';
+		const first = await started('h');
+		// Counter takes a start value; the script passes a number where viem wants a bigint
+		const counter = TEMPLATE_FILES[COUNTER].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }');
+		const script = TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],');
+		first.edit(COUNTER, counter);
+		first.edit(DEPLOY, script);
+		first.select(COUNTER);
+		await first.dispose();
+
+		const reloaded = await started('h');
+		expect(get(reloaded).files).toEqual({...startingProject(), [COUNTER]: counter, [DEPLOY]: script});
+		expect(get(reloaded).selected).toBe(COUNTER);
+		// the language service has the saved script, and the background compile the saved contract
+		await expect.poll(() => get(reloaded).languageService.status, {timeout: 20_000}).toBe('ready');
+		const service = reloaded.languageService()!;
+		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
+			"Type 'number' is not assignable to type 'bigint'.",
+		]);
+		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+	});
+
+	it('starts from the starting project on an empty files database', async () => {
+		const session = await started('i');
+		expect(get(session).files).toEqual(startingProject());
+		expect(get(session).selected).toBe('deploy/01_deploy_counter.ts');
 	});
 
 	it('stops a run that never finishes, and the next run works on the same chain', async () => {

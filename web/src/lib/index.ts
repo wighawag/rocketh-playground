@@ -77,6 +77,7 @@ export function createPlayground() {
 		compilerBytes: solc.bytes,
 		chainDB: 'rocketh-playground-chain',
 		deploymentsDB: 'rocketh-playground-deployments',
+		filesDB: 'rocketh-playground-files',
 	});
 }
 export const SOLC_VERSION = solc.version;
