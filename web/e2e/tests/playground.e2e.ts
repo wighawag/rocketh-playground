@@ -1,5 +1,6 @@
 import {test, expect, devices, type Page} from '@playwright/test';
 import {readFileSync} from 'node:fs';
+import {strFromU8, unzipSync} from 'fflate';
 import {PLAIN_URL} from '../ports';
 
 /**
@@ -404,6 +405,25 @@ test('Reset, once confirmed, gives the starting project on a fresh chain with no
 	await expect(editor(page)).not.toContainText('args: [1],');
 	await deploy(page, /^1 transaction sent$/);
 	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
+});
+
+test("Download saves a hardhat-deploy project zip holding the reader's edit, without the records", async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	await deploy(page, /^1 transaction sent$/);
+	const script = `${template(DEPLOY)}\n// edited before Download\n`;
+	await editFile(page, DEPLOY, script);
+
+	const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download').click()]);
+	expect(download.suggestedFilename()).toBe('rocketh-playground-project.zip');
+	const zip = unzipSync(new Uint8Array(readFileSync(await download.path())));
+	const file = (path: string) => (zip[`rocketh-playground-project/${path}`] ? strFromU8(zip[`rocketh-playground-project/${path}`]) : undefined);
+	expect(file(DEPLOY)).toContain('// edited before Download');
+	expect(file(COUNTER)).toBe(template(COUNTER));
+	expect(file('README.md')).toContain('pnpm i && pnpm hardhat compile && pnpm hardhat deploy');
+	expect(file('package.json')).not.toContain('workspace:');
+	expect(Object.keys(zip).some((path) => path.includes('/deployments/'))).toBe(false);
+	await expect(page.getByTestId('download-error')).toBeHidden();
 });
 
 test.describe('on a phone', () => {
