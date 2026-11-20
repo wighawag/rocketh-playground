@@ -19,6 +19,10 @@ export type DeployedContract = {
 	abi: Abi;
 	/** The record it was read from, `deployments/playground/Counter.json`. */
 	path: string;
+	/** The transaction that deployed it, as the record says (`transaction.hash`), when it does. */
+	transactionHash?: `0x${string}`;
+	/** Its ABI-encoded constructor arguments (`argsData`), when the record has them. */
+	argsData?: `0x${string}`;
 	viewFunctions: AbiFunction[];
 	writeFunctions: AbiFunction[];
 };
@@ -48,7 +52,7 @@ function parseRecords(records: ProjectFiles): DeployedContract[] {
 		const file = path.slice(FOLDER.length);
 		// `.chain`, `.migrations.json` and pending transactions are rocketh's, not deployments
 		if (file.includes('/') || file.startsWith('.')) continue;
-		let record: {address?: unknown; abi?: unknown};
+		let record: {address?: unknown; abi?: unknown; argsData?: unknown; transaction?: {hash?: unknown}};
 		try {
 			record = JSON.parse(content);
 		} catch {
@@ -62,9 +66,13 @@ function parseRecords(records: ProjectFiles): DeployedContract[] {
 			address: record.address as `0x${string}`,
 			abi,
 			path,
+			...(isHex(record.transaction?.hash) ? {transactionHash: record.transaction.hash} : {}),
+			...(isHex(record.argsData) ? {argsData: record.argsData} : {}),
 			viewFunctions: functions.filter((f) => isViewFunction(f.stateMutability)),
 			writeFunctions: functions.filter((f) => !isViewFunction(f.stateMutability)),
 		});
 	}
 	return contracts.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+const isHex = (value: unknown): value is `0x${string}` => typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value);
