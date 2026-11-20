@@ -34,3 +34,7 @@ covers: [18]
 > Done means the template's change has been merged here from `stem`, `pnpm verify` is green with 4273 and 4274 held by another process, and `work/notes/observations/e2e-default-ports-shared.md` is removed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Done (2026-11-20)
+
+Landed in `template-svelte` (`web/e2e/free-port.ts`, `web/e2e/ports.ts`, `web/test/e2e-ports.test.ts`, commit cee769b) and cascaded with `offshoot-fanout` through `template-svelte-tailwind` and `template-svelte-shadcn` to this repository. `pnpm verify` here passed with 4273 and 4274 held by another process (24 e2e tests on free ports), and with `E2E_GATEWAY_PLAIN_PORT=4273` set and busy the run fails naming it. The observation `e2e-default-ports-shared.md` is removed.
