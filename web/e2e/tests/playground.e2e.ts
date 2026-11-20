@@ -5,7 +5,8 @@ import {PLAIN_URL} from '../ports';
 /**
  * The playground in a real browser, against the production build: what only a browser can show.
  * The four workers start (one of them classic, for soljson's `importScripts`), Deploy writes the
- * records, a reload restores them with the chain, and Stop ends a script that never yields.
+ * records, a reload restores them with the chain and the reader's files, and Stop ends a script
+ * that never yields.
  *
  * Each test gets a fresh browser context, so empty IndexedDB; a reload inside a test keeps it.
  *
@@ -66,6 +67,52 @@ test('Deploy writes the records, a second Deploy sends nothing, and a reload res
 	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
 	await expect(records.locator('[data-path="deployments/playground/Counter.json"]')).toBeVisible();
 	await deploy(page, /^Up to date: nothing sent$/);
+});
+
+/** What the page has saved of the project, read from its IndexedDB database. */
+function savedFile(page: Page, path: string) {
+	return page.evaluate(
+		(path) =>
+			new Promise<string | undefined>((resolve, reject) => {
+				const open = indexedDB.open('rocketh-playground-files');
+				open.onerror = () => reject(open.error);
+				open.onsuccess = () => {
+					const db = open.result;
+					if (!db.objectStoreNames.contains('project')) return (db.close(), resolve(undefined));
+					const get = db.transaction('project').objectStore('project').get('files');
+					get.onsuccess = () => (db.close(), resolve((get.result as Record<string, string> | undefined)?.[path]));
+					get.onerror = () => reject(get.error);
+				};
+			}),
+		path,
+	);
+}
+
+test('edits to a script and a contract, and the selected file, are still there after a reload, typed and compiled', async ({page}) => {
+	await page.goto(PLAIN_URL);
+	await ready(page);
+	// Counter takes a start value; the script passes a number where viem's types want a bigint
+	const script = template(DEPLOY).replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],');
+	const counter = template(COUNTER).replace('uint public x;', 'uint public x;\n\n  constructor(uint start) {\n    x = start;\n  }');
+	await editFile(page, DEPLOY, script);
+	await editFile(page, COUNTER, counter);
+	// each edit is written as it is made; wait for the last one to reach storage before reloading
+	await expect.poll(() => savedFile(page, COUNTER)).toBe(counter);
+
+	await page.reload();
+	await expect(editor(page)).toHaveAttribute('aria-label', COUNTER);
+	await expect(editor(page)).toContainText('constructor(uint start)');
+	await ready(page);
+	await page.locator(`[data-testid="project-files"] [data-path="${DEPLOY}"]`).click();
+	await expect(editor(page)).toContainText('args: [1],');
+	// typed from the saved script and the saved contract's types: the one error is the number
+	await typed(page);
+	const flagged = page.locator('[data-testid="editor"] .cm-lintRange-error');
+	await expect(flagged).toHaveText('1', {timeout: 30_000});
+	await flagged.hover();
+	await expect(page.locator('.cm-tooltip-hover, .cm-tooltip-lint').first()).toContainText("Type 'number' is not assignable to type 'bigint'.");
+	await deploy(page, /^1 transaction sent$/);
+	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
 });
 
 test('Stop ends a script that never yields, and the chain is still there', async ({page}) => {

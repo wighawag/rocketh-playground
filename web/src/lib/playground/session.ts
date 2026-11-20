@@ -7,7 +7,9 @@
  * worker only, so the chain (in the EVM worker) is untouched.
  *
  * The workers are a parameter (`./workers.ts` makes the browser's), so the node tests run a whole
- * session with the same hosts served on MessageChannels.
+ * session with the same hosts served on MessageChannels. So are the IndexedDB databases: the chain
+ * and the records are kept by their workers, the files and the selection by the session itself
+ * (`./project/saved-project.ts`), opened before anything reads them.
  *
  * It is also the source of truth for the editor: the editor dispatches each edit here (`edit`),
  * and the session forwards it to the TypeScript worker's language service, which it starts after
@@ -36,6 +38,7 @@ import {INITIAL_BALANCE, TEST_ADDRESSES} from './runner/test-keys.js';
 import {formatDiagnostic, type Diagnostic} from './diagnostic.js';
 import {phaseLabel} from './format.js';
 import {startingProject, type ProjectFiles} from './project/template.js';
+import {openSavedProject, type SavedProject} from './project/saved-project.js';
 
 /** What the session needs of a worker: a `Worker`, or a MessagePort with a `terminate` in tests. */
 export type WorkerLike = {
@@ -60,6 +63,12 @@ export type SessionOptions = {
 	/** IndexedDB database names; omit one to keep that store in memory. */
 	chainDB?: string;
 	deploymentsDB?: string;
+	/**
+	 * The project's files and which one is selected. With one, `start()` opens what the last session
+	 * on it left, or `files` when it holds nothing yet, and every edit is written back.
+	 */
+	filesDB?: string;
+	/** The project a session starts from (with `filesDB`: only while that database is empty). */
 	files?: ProjectFiles;
 	/** How long after the last edit to a `.sol` file the background compile starts. */
 	compileDebounceMs?: number;
@@ -152,6 +161,9 @@ const TRANSCRIPT_LIMIT = 2000;
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** What a project opens on: its first deploy script. */
+const firstSelected = (files: ProjectFiles) => Object.keys(files).find((p) => p.startsWith('deploy/')) ?? Object.keys(files)[0];
+
 export function createPlaygroundSession(options: SessionOptions): PlaygroundSession {
 	const files = options.files ?? startingProject();
 	let state: PlaygroundState = {
@@ -160,7 +172,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		languageService: {status: 'off'},
 		artifactTypes: 0,
 		files,
-		selected: Object.keys(files).find((p) => p.startsWith('deploy/')) ?? Object.keys(files)[0],
+		selected: firstSelected(files),
 		records: {},
 		transcript: [],
 		diagnostics: [],
@@ -348,12 +360,32 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		await ready;
 	}
 
+	// --- the saved project ------------------------------------------------------------------------
+	let saved: SavedProject | undefined;
+
+	/** The files and the selection the last session on `filesDB` left, before anything reads them. */
+	async function openProject() {
+		if (!options.filesDB) return;
+		try {
+			saved = await openSavedProject(options.filesDB, files);
+		} catch (error) {
+			// The project still works, from memory: losing the edits at a reload beats not starting.
+			say('warning', `Your files could not be read from this browser's storage, and edits will not be kept: ${messageOf(error)}`);
+			return;
+		}
+		const restored = saved.files;
+		// A saved selection is a project file or a record (which the runner restores next).
+		set({files: restored, selected: saved.selected ?? firstSelected(restored)});
+	}
+
 	// --- lifecycle --------------------------------------------------------------------------------
 	async function start() {
 		if (state.phase !== 'idle') return;
 		set({phase: 'booting'});
 		startedAt = performance.now();
 		try {
+			// First: the background compile and the language service read the files.
+			await openProject();
 			// The compiler first: it is the long download, and it loads while the rest boots. The
 			// starting project is compiled as soon as it has, for the editor's artifact types.
 			startCompiler();
@@ -370,6 +402,8 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			};
 			node = await createWorkerNode(evmOptions as never);
 			await startRunner();
+			// A selected record that is no more (the records are restored by now): the first script.
+			if (!(state.selected in state.files) && !(state.selected in state.records)) set({selected: firstSelected(state.files)});
 			set({typescriptVersion: await typescript.version});
 			await refreshBlockNumber();
 			set({phase: 'ready'});
@@ -463,6 +497,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	function edit(path: string, text: string) {
 		set((s) => ({files: {...s.files, [path]: text}}));
+		saved?.write(path, text);
 		// Forwarded at once, so the worker has this text before the editor asks for its lints.
 		if (state.languageService.status === 'ready') void typescript!.setFiles({[path]: text});
 		if (path.endsWith('.sol') && compilerWorker) {
@@ -473,6 +508,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	function select(path: string) {
 		set({selected: path});
+		saved?.select(path);
 	}
 
 	async function dispose() {
@@ -482,6 +518,10 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		compilerWorker?.terminate();
 		typescriptWorker?.terminate();
 		await node?.dispose().catch(() => {});
+		// What was typed last reaches storage before the session lets go of it.
+		await saved?.flush().catch(() => {});
+		saved?.dispose();
+		saved = undefined;
 		runner = undefined;
 		node = undefined;
 		set({phase: 'idle'});

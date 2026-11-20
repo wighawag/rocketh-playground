@@ -9,7 +9,7 @@
 // looked up through `releases[version]`: `builds` also lists nightlies under the same `version`
 // ("0.8.28" with prerelease "nightly.2024.9.4"), so a search by version finds the wrong file.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
 const HOST = 'https://binaries.soliditylang.org/bin';
@@ -37,7 +37,18 @@ export async function ensureSoljson({log = console.log} = {}) {
 	// `bytes` is what the page shows while the compiler loads; a stale value would mislead it.
 	if (bytes.length !== pinned.bytes) throw new Error(`${path}: ${bytes.length} bytes, solc.json says ${pinned.bytes}`);
 	mkdirSync(new URL('static/solc/', web), {recursive: true});
-	writeFileSync(soljsonPath, bytes);
+	// Several vitest workers can call this at once on a tree with no soljson yet, and each fetches and
+	// writes the file. Writing in place lets one worker read a half-written file while another is still
+	// writing it, so each writes its own temporary file beside the final one and renames it over the
+	// final path: a rename within one directory is atomic, so a reader sees either no file or a whole one.
+	const temporary = `${soljsonPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+	try {
+		writeFileSync(temporary, bytes);
+		renameSync(temporary, soljsonPath);
+	} catch (error) {
+		rmSync(temporary, {force: true});
+		throw error;
+	}
 	log(`solc ${pinned.version}: fetched ${path} (${bytes.length} bytes), sha256 matches list.json`);
 	return soljsonPath;
 }
