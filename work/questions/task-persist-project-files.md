@@ -30,3 +30,4 @@
 <!-- q1 fields: id=q1 kind=stuck -->
 
 **Your answer** (write below this line):
+Retry, continuing from the kept branch. The gate failed in the fresh worktree on a pre-existing race, not on this task's code: in a clean tree `web/static/solc/` has no soljson, so several vitest workers call `ensureSoljson` (`web/scripts/soljson.mjs`) at once, each fetches and rewrites the file with `writeFileSync`, and one worker's `loadSoljson` reads it while another is rewriting it (the SyntaxError in `test/lib/playground/helpers.ts`, seen from `workers.test.ts`). Keep the persist work as it is and also fix the race: make `ensureSoljson` write atomically (write to a unique temporary file in `static/solc/`, then `renameSync` it over the final path), with a comment saying why. Record it in the Decisions block. Check that `pnpm verify` passes from a tree with no `web/static/solc/`.
