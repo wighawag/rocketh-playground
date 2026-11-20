@@ -13,6 +13,8 @@ covers: [5]
 
 1. What should the reader see? For example: a link to rocketh.dev's migration guide in the transcript when a script fails in a way a v1-style script does (which failures count?), a "Migrating from v1" link always visible beside the editor, or the guide in a pane next to the editor.
 2. Is a "paste a v1 script" sample part of it, and if so where does the reader find it?
+3. Which failure is the one to recognise? A v1 script's first error could be the registry refusing `hardhat-deploy/types` or `hardhat/types`, or a TypeError on `hre.deployments`, depending on how TypeScript drops type-only imports.
+4. Once answered, which tasks does it wait for? It will touch the header, the session or the transcript, which the persist, reset, download and share chain also edits, so it should be blocked by the tail of that chain.
 
 <!-- /open-questions -->
 
@@ -22,7 +24,7 @@ Story 5: a hardhat-deploy v1 user pastes a v1-style deploy script, sees where it
 
 ## Acceptance criteria
 
-- [ ] A v1-style deploy script (the shape of hardhat-deploy v1's `DeployFunction`) run in the playground fails with a message that leads to the migration guide, as the answer to the open question decides (e2e).
+- [ ] A v1-style deploy script (the shape of hardhat-deploy v1's `DeployFunction`) run in the playground shows the reader the way to the migration guide, in the form the answers decide (e2e; the exact criterion is written with the answers).
 - [ ] Tests cover the new behaviour.
 
 ## Blocked by
@@ -35,7 +37,7 @@ Story 5: a hardhat-deploy v1 user pastes a v1-style deploy script, sees where it
 >
 > FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does it still match the code, `work/tasks/done/`, and the tasks it depends on? If a dependency landed differently than this task assumes, do NOT build on the stale premise: stop and report the discrepancy.
 >
-> The repository is wighawag/rocketh-playground, the rocketh playground at play.rocketh.dev: a reader edits a hardhat-deploy project (Solidity and rocketh deploy scripts) in the browser, compiles it in the tab and runs the deploy scripts with the published rocketh against an EVM in the tab (webevm). Read, before anything else: `AGENTS.md` (the template's conventions, then the section for this repository), `web/src/lib/playground/README.md` (the four workers, `session.ts` as the page's store, the Contracts and Transactions views), and the spec this task comes from, `work/specs/tasked/rocketh-playground.md` (its Decisions, Implementation Decisions, security boundary and Testing Decisions bind this work). The rules that bite most often: `.svelte` files render and wire only (logic in plain `.ts`, reactivity crosses as stores, never a `.svelte.ts` file); only `web/src/lib/kit` imports `$app/*`; user code never runs on the page's thread; no dependency is added that the spec's Decisions do not approve without asking; the repository is public (describe a change by what it does for a user); never write an em dash; do not hard-wrap Markdown prose. Bound every shell command with `timeout` and cap its output; never grep recursively through node_modules, build output or .git; before Playwright, check ports 4273 and 4274 are free (`ss -ltnp`) and if not set `E2E_GATEWAY_PLAIN_PORT`/`E2E_GATEWAY_SW_PORT` to free ports, never kill a process you did not start.
+> The repository is wighawag/rocketh-playground, the rocketh playground at play.rocketh.dev: a reader edits a hardhat-deploy project (Solidity and rocketh deploy scripts) in the browser, compiles it in the tab and runs the deploy scripts with the published rocketh against an EVM in the tab (webevm). Read, before anything else: `AGENTS.md` (the template's conventions, then the section for this repository), `web/src/lib/playground/README.md` (the four workers, `session.ts` as the page's store, the Contracts view, and the Transactions view once pull request #7 has landed), and the spec this task comes from, `work/specs/tasked/rocketh-playground.md` (its Decisions, Implementation Decisions, security boundary and Testing Decisions bind this work). The rules that bite most often: `.svelte` files render and wire only (logic in plain `.ts`, reactivity crosses as stores, never a `.svelte.ts` file); only `web/src/lib/kit` imports `$app/*`; user code never runs on the page's thread; no dependency is added that the spec's Decisions do not approve without asking; the repository is public (describe a change by what it does for a user); never write an em dash; do not hard-wrap Markdown prose. Bound every shell command with `timeout` and cap its output; never grep recursively through node_modules, build output or .git; before Playwright, check ports 4273 and 4274 are free (`ss -ltnp`) and if not set `E2E_GATEWAY_PLAIN_PORT`/`E2E_GATEWAY_SW_PORT` to free ports, never kill a process you did not start.
 >
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
