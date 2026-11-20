@@ -35,3 +35,14 @@ A Reset button in the header returns the playground to its first visit: the star
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- The chain is reset by starting a new node with a `fresh` option (`EVMNodeOptions.fresh` in `web/src/lib/playground/evm/evm-host.ts`). The node is told nothing is saved, and its block-0 state is saved over the chain database before it is handed back. The other option was deleting the IndexedDB database. That waits forever while any connection is open, and webevm's adapter never closes its own, so the delete would hang. Overwriting the record works with webevm 0.9.1's published API unchanged.
+- The deployment records are reset by restarting the runner with `fresh` on its `init` message (`runner/protocol.ts`). It empties the store (`vfs.restore({})`) and waits for the save before it reports `ready`. The runner has to be restarted anyway, because its provider is a port the old node served. So this extends the restart Stop already does rather than adding a new message.
+- The session gets a new phase, `resetting` (label "Resetting"). Like `deploy`, `reset()` silently does nothing outside `ready`, rather than throwing as `transact` does, because the button is already disabled then.
+- The transcript is kept, not cleared, and Reset adds the line "Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone." The reader's run history stays readable, and the task asks for the transcript to say what Reset did. The diagnostics, the last run and the named accounts are cleared, as on a first visit. The alternative was an empty transcript, which would match a first visit more literally.
+- After Reset the first deploy script is selected (and saved as the selection), as on a first visit, even if the reader had another file open.
+- The page closes an open Contracts or Transactions view as soon as Reset is confirmed, before the reset finishes. That UI state is local to `Playground.svelte`, which is where the closing happens.
+- If Reset fails partway, the session goes to `failed` with "The playground could not reset: ..." in the transcript, as a failed start does. There is no rollback, because the old chain and records are already gone by then.
+- `TypeScriptWorkerApi` gains `removeFiles(paths)`, which wraps the language service's existing `deleteFile`. `setFiles` only adds or updates, so without it a file the reader had added would stay in the type program after Reset.

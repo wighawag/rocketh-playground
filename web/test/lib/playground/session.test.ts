@@ -166,6 +166,68 @@ describe('a playground session', () => {
 		expect(get(session).selected).toBe('deploy/01_deploy_counter.ts');
 	});
 
+	it('resets to the starting project on a fresh chain with no records, and a new session starts from that too', async () => {
+		const DEPLOY = 'deploy/01_deploy_counter.ts';
+		const COUNTER = 'contracts/Counter.sol';
+		const session = await started('j');
+		await session.deploy();
+		expect(get(session).blockNumber).toBe(1);
+		// edits the language service flags (a number where viem wants a bigint), a new file, another selection
+		session.edit(COUNTER, TEMPLATE_FILES[COUNTER].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }'));
+		session.edit(DEPLOY, TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],'));
+		session.edit('deploy/02_more.ts', "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n");
+		session.select(COUNTER);
+		await expect.poll(() => get(session).languageService.status, {timeout: 20_000}).toBe('ready');
+		const service = session.languageService()!;
+		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
+			"Type 'number' is not assignable to type 'bigint'.",
+		]);
+
+		const phases: string[] = [];
+		const unsubscribe = session.subscribe((s) => phases.push(s.phase));
+		await session.reset();
+		unsubscribe();
+		expect(phases).toContain('resetting');
+		const state = get(session);
+		expect(state).toMatchObject({phase: 'ready', blockNumber: 0, records: {}, selected: DEPLOY, diagnostics: []});
+		expect(state.files).toEqual(startingProject());
+		expect(state.lastRun).toBeUndefined();
+		expect(state.namedAccounts).toBeUndefined();
+		expect(lines(session).at(-1)).toBe(
+			'[playground] Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone.',
+		);
+		// the language service has the starting files again, typed with their artifact types
+		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([]);
+		// the reset chain serves the Contracts view's reads
+		expect(await session.provider()!.request({method: 'eth_blockNumber'})).toBe('0x0');
+
+		expect(await session.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		expect(get(session).blockNumber).toBe(1);
+		await session.reset();
+		await session.dispose();
+
+		// what was saved is the starting project, the fresh chain and no records
+		const reloaded = await started('j');
+		expect(get(reloaded)).toMatchObject({blockNumber: 0, records: {}, selected: DEPLOY});
+		expect(get(reloaded).files).toEqual(startingProject());
+		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+	});
+
+	it('refuses to reset while a run is in progress, changing nothing', async () => {
+		const session = await started('k');
+		const wait = "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {});\n";
+		session.edit('deploy/02_wait.ts', wait);
+		const running = session.deploy();
+		await expect.poll(() => lines(session).includes('[script] waiting forever')).toBe(true);
+		await session.reset();
+		expect(get(session).phase).toBe('running');
+		expect(get(session).files['deploy/02_wait.ts']).toBe(wait);
+		await session.stop();
+		await running;
+		expect(get(session).blockNumber).toBe(1);
+		expect(get(session).files['deploy/02_wait.ts']).toBe(wait);
+	});
+
 	it('stops a run that never finishes, and the next run works on the same chain', async () => {
 		const session = await started('e');
 		await session.deploy();

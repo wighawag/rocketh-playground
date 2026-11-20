@@ -6,7 +6,7 @@
  * - the editor's language service (`./language-service.ts`), started by `startLanguageService`
  *   once the editor is usable: it loads the declarations (a separate asset in the browser,
  *   `./typescript.worker.ts`) and then answers `@valtown/codemirror-ts`'s calls (`updateFile`,
- *   `getLints`, `getAutocompletion`, `getHover`) and the session's (`setFiles`,
+ *   `getLints`, `getAutocompletion`, `getHover`) and the session's (`setFiles`, `removeFiles`,
  *   `setArtifactTypes`). Before it has started, those answer nothing, as an empty file would.
  */
 import type tsModule from 'typescript';
@@ -46,6 +46,10 @@ export function typeScriptApi(ts: typeof tsModule, loadDeclarations: LoadDeclara
 		},
 		setFiles(files: ProjectFiles) {
 			service?.setFiles(files);
+		},
+		/** Project files that are no more (a Reset drops the files the reader added). */
+		removeFiles(paths: string[]) {
+			for (const path of paths) service?.deleteFile(path);
 		},
 		setArtifactTypes(types: ProjectFiles) {
 			service?.setArtifactTypes(types);

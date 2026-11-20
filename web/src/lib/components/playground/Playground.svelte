@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {Button} from '$lib/core/ui/button';
+	import * as Dialog from '$lib/shadcn/ui/dialog';
 	import type {PlaygroundSession} from '$lib/playground/session';
 	import {compilerLabel, lastRunLabel, phaseLabel} from '$lib/playground/format';
 	import FileList from './FileList.svelte';
@@ -8,8 +9,17 @@
 
 	let {session, solcVersion}: {session: PlaygroundSession; solcVersion: string} = $props();
 	const busy = $derived(
-		$session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running' || $session.phase === 'sending',
+		$session.phase === 'compiling' || $session.phase === 'transpiling' || $session.phase === 'running' || $session.phase === 'sending' || $session.phase === 'resetting',
 	);
+	/** Whether the Reset confirmation is open. */
+	let confirmingReset = $state(false);
+	function confirmReset() {
+		confirmingReset = false;
+		// the views show the chain that is going away
+		contract = undefined;
+		transactions = false;
+		void session.reset();
+	}
 	/** The contract the centre pane shows instead of a file, when one is picked. */
 	let contract = $state<string | undefined>();
 	/** Whether the centre pane shows the chain's transactions. */
@@ -25,6 +35,7 @@
 		<h1 class="text-lg font-semibold">rocketh playground</h1>
 		<Button data-testid="deploy" onclick={() => session.deploy()} disabled={$session.phase !== 'ready'}>Deploy</Button>
 		<Button data-testid="stop" variant="outline" onclick={() => session.stop()} disabled={$session.phase !== 'running'}>Stop</Button>
+		<Button data-testid="reset" variant="outline" onclick={() => (confirmingReset = true)} disabled={$session.phase !== 'ready'}>Reset</Button>
 		<span data-testid="phase" data-phase={$session.phase} class="text-sm">
 			{phaseLabel($session.phase)}{#if busy}...{/if}
 		</span>
@@ -87,6 +98,21 @@
 			<Transcript lines={$session.transcript} />
 		</section>
 	</main>
+
+	<Dialog.Root bind:open={confirmingReset}>
+		<Dialog.Content data-testid="reset-dialog">
+			<Dialog.Header>
+				<Dialog.Title>Start again from the starting project?</Dialog.Title>
+				<Dialog.Description>
+					Your edits, the chain in this tab and the deployment records are thrown away, here and in this browser's storage. This cannot be undone.
+				</Dialog.Description>
+			</Dialog.Header>
+			<Dialog.Footer>
+				<Button data-testid="reset-cancel" variant="outline" onclick={() => (confirmingReset = false)}>Cancel</Button>
+				<Button data-testid="reset-confirm" variant="destructive" onclick={confirmReset} disabled={$session.phase !== 'ready'}>Reset</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
 
 	<footer class="border-t px-4 py-1 text-xs text-muted-foreground">
 		Everything runs in this tab: the compiler, the chain and your scripts, which run in a worker and can fetch any URL, like any page you choose to run. The accounts are well-known throwaway test keys. Nothing is sent to a network.

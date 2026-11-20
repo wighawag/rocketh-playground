@@ -24,6 +24,7 @@ const PHASES: Record<Phase, string> = {
 	running: 'Running the deploy scripts',
 	stopping: 'Stopping',
 	sending: 'Sending a transaction',
+	resetting: 'Resetting',
 	failed: 'Something went wrong',
 };
 

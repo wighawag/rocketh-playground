@@ -4,7 +4,7 @@
  *
  * One deployment store and one provider for the life of the runner. Stop is the page terminating
  * the runner and starting another, which re-opens the store from IndexedDB; the chain is in the
- * EVM worker and does not notice.
+ * EVM worker and does not notice. Reset is the same restart with `fresh`, which empties the store.
  */
 import {providerOverPort, type PortLike} from '@eip-1193/over-port';
 import {createLogStream} from '@rocketh/playground/log';
@@ -39,6 +39,10 @@ export function serveRunner(scope: Scope): void {
 			? await web.createIndexedDBDeploymentStore({db: request.deploymentsDB})
 			: web.createVFSDeploymentStore();
 		const vfs = store.vfs;
+		if (request.fresh) {
+			vfs.restore({});
+			await vfs.flush?.();
+		}
 		vfs.subscribe((change) => {
 			if (change.type === 'write') post({type: 'store', change: 'write', path: change.path, content: vfs.read(change.path)});
 			else if (change.type === 'restore') post({type: 'store', change: 'restore', files: vfs.snapshot()});

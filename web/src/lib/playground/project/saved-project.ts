@@ -28,6 +28,8 @@ export type SavedProject = {
 	selected?: string;
 	write(path: string, text: string): void;
 	select(path: string): void;
+	/** Replace every saved file with `files` (a file not in it is gone) and save `selected`. */
+	reset(files: ProjectFiles, selected: string): void;
 	/** Resolves once every change made so far has reached storage. */
 	flush(): Promise<void>;
 	/** Stop writing through; the database keeps what it has. */
@@ -43,15 +45,20 @@ export async function openSavedProject(db: string, initial: ProjectFiles): Promi
 	// Saves run one after the other, so the last selection is the one kept.
 	let selecting: Promise<void> = Promise.resolve();
 	let disposed = false;
+	function select(path: string) {
+		if (disposed) return;
+		selecting = selecting.then(() =>
+			selection.save({path}).catch((error) => console.error('failed to save the selected file', error)),
+		);
+	}
 	return {
 		files: vfs.snapshot(),
 		selected: saved?.path,
 		write: (path, text) => vfs.write(path, text),
-		select(path) {
-			if (disposed) return;
-			selecting = selecting.then(() =>
-				selection.save({path}).catch((error) => console.error('failed to save the selected file', error)),
-			);
+		select,
+		reset(files, selected) {
+			vfs.restore(files);
+			select(selected);
 		},
 		async flush() {
 			await Promise.all([vfs.flush(), selecting]);
