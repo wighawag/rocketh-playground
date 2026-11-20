@@ -38,3 +38,11 @@ A test that takes the zip Download produces for the starting project, unzips it 
 > Done means `pnpm verify` (from the repository root) is green with the new tests in it, and `web/src/lib/playground/README.md` describes what changed.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your final report. When the task did not specify some behaviour and you had to choose, say what you chose and why.
+
+## Decisions
+
+- **The child commands use whatever `pnpm` is on `PATH`, with a reader's environment, not the test run's.** The exported project has no `packageManager` field, so a reader gets their own pnpm (pnpm 11.25.0 on the machine this was built on). Before spawning, the test drops `npm_*`, `PNPM_*`, `VITEST*`, `INIT_CWD`, `NODE_ENV`, `TEST` and any `node_modules` folder on `PATH`. The alternative was to pin the repository's pnpm 10.28.1, but that is not what a reader runs.
+- **The store is redirected with both `pnpm_config_store_dir` and `npm_config_store_dir`.** pnpm 11 ignores `npm_config_store_dir`, which is the variable the task names. The test's own `pnpm store path` assertion caught this: with only that variable, pnpm 11 used the real store. All four XDG folders (cache, config, data, state) are also moved inside the temporary folder, so pnpm's metadata cache and hardhat's config stay out of the user's folders too.
+- **"The real ones are untouched" means: no file this run wrote below its temporary store or hardhat cache was also written below the real ones during the run.** It compares modification times only. Comparing change times would fail whenever any other project hard-links a store file. A snapshot of the whole real folder was rejected because unrelated installs on the machine would make it fail. The limit of this choice is noted in the README.
+- **One temporary folder holds a shared store and cache for the three cases.** The second install reuses the store instead of downloading again. The broken-export case sits in the same folder, so it is cleaned up and checked the same way.
+- **The broken-export case is a permanent part of `pnpm test:export`, not a one-off check.** The failure path stays tested as releases move, at the cost of one fast failing install.
