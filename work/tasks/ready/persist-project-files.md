@@ -4,6 +4,7 @@ slug: persist-project-files
 spec: rocketh-playground
 blockedBy: []
 covers: [11]
+needsAnswers: true
 ---
 
 ## What to build
