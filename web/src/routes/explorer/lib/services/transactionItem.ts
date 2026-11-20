@@ -1,13 +1,10 @@
-// Copied from jolly-roger web/src/routes/explorer/lib/services/transactionItem.ts, at commit
-// 8a73e680. Changed here: `loadTransactionItemData` takes `contracts` as a third parameter and
-// passes it on to `decodeTransaction` (./transactionDecoder.ts, which takes the contracts as a
-// parameter in the playground). Nothing else is changed.
+// Copied from jolly-roger web/src/routes/explorer/lib/services/transactionItem.ts, at commit a4082a13; nothing below this line is changed.
 import type {PublicClient, Transaction, TransactionReceipt} from 'viem';
 import {
 	decodeTransaction,
 	type DecodedTransactionData,
-	type DecodingContracts,
 } from './transactionDecoder';
+import type {DecodingContracts} from '../utils';
 
 export interface TransactionItemData {
 	decodedData: DecodedTransactionData;

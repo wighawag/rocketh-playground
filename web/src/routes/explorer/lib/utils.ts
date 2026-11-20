@@ -1,13 +1,4 @@
-// Copied from jolly-roger web/src/routes/explorer/lib/utils.ts, at commit 8a73e680. Changed here,
-// so the contracts are a parameter rather than jolly-roger's generated deployments
-// (`$lib/deployments-store`, which the playground does not have):
-// - the module-level `import {deployments} from '$lib/deployments-store'` is gone;
-// - `findContractByAddress` and `decodeLogs` take `contracts` (`DecodingContracts`, the shape of
-//   `deployments.get().contracts`, its only use of the store);
-// - the re-export of four helpers from `$lib/core/utils/ethereum/blockExplorer` at the end is gone:
-//   that module imports `$env/static/public` and `$lib/deployments-store`, and the playground's
-//   chain is in the tab, with no block explorer.
-// Nothing else is changed.
+// Copied from jolly-roger web/src/routes/explorer/lib/utils.ts, at commit a4082a13; nothing below this line is changed.
 import type {Abi, Address, Log, Transaction, TransactionReceipt} from 'viem';
 import {decodeEventLog} from 'viem';
 import {
@@ -37,12 +28,12 @@ export interface DecodedEvent {
 
 /**
  * The contracts to decode with, by name: the shape of jolly-roger's
- * `deployments.get().contracts`
+ * `deployments.get().contracts`, which its callers pass, read at call time
  */
 export type DecodingContracts = Record<string, {address: string; abi: unknown}>;
 
 /**
- * Find contract in deployments by address
+ * Find a contract of `contracts` by address
  */
 export function findContractByAddress(
 	address: Address,
@@ -89,7 +80,7 @@ function decodeLogWithAbi(log: Log, abi: Abi): DecodedEvent | null {
 }
 
 /**
- * Decode logs using deployments.ts data
+ * Decode logs with the ABIs of `contracts`
  */
 export function decodeLogs(
 	logs: Log[],

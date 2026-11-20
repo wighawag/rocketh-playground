@@ -4,17 +4,16 @@
 	contract's name and address, then Read and Write tabs with a card per function. The contract
 	is picked in the file list rather than with that page's select, and the list comes from the
 	deployment records ($lib/playground/contracts/records.ts), not from a generated deployments
-	file. Loaded on demand by Playground.svelte, with viem's ABI and signing code.
+	file. The address is jolly-roger's $lib/core/ui/ethereum/Address.svelte, in full, with its copy
+	button. Loaded on demand by Playground.svelte, with viem's ABI and signing code.
 -->
 <script lang="ts">
 	import * as Tabs from '$lib/shadcn/ui/tabs';
 	import * as Empty from '$lib/shadcn/ui/empty';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code';
-	import CopyIcon from '@lucide/svelte/icons/copy';
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import ContractFunction from '../../../routes/contracts/components/ContractFunction.svelte';
 	import {getFunctionSignature} from '../../../routes/contracts/lib/utils';
-	import {createCopyToClipboard} from '$lib/core/ui/clipboard/copy-to-clipboard';
+	import Address from '$lib/core/ui/ethereum/Address.svelte';
 	import {truncateHex} from '$lib/core/utils/format';
 	import {contractsFromRecords} from '$lib/playground/contracts/records';
 	import {signingAccounts} from '$lib/playground/contracts/accounts';
@@ -27,7 +26,6 @@
 	let fromIndex = $state<number | undefined>();
 	const from = $derived(accounts.find((a) => a.keyIndex === fromIndex) ?? accounts[0]);
 	const canWrite = $derived($session.phase === 'ready');
-	const copied = createCopyToClipboard();
 </script>
 
 <div class="h-full overflow-auto p-3" data-testid="contracts">
@@ -44,18 +42,14 @@
 			<div class="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-lg bg-muted/50 p-3">
 				<div class="min-w-0">
 					<h2 class="text-lg font-semibold" data-testid="contract-name">{contract.name}</h2>
-					<span class="inline-flex max-w-full items-center gap-1 font-mono text-xs">
-						<span class="break-all" data-testid="contract-address">{contract.address}</span>
-						<button
-							type="button"
-							class="inline-flex size-4 shrink-0 cursor-copy items-center justify-center rounded opacity-50 transition-opacity hover:opacity-100 focus:opacity-100"
-							title="Copy address"
-							aria-label="Copy address"
-							onclick={() => copied.copy(contract.address)}
-						>
-							{#if $copied}<CheckIcon class="size-3 text-green-500" />{:else}<CopyIcon class="size-3" />{/if}
-						</button>
-					</span>
+					<Address
+						value={contract.address}
+						truncate={false}
+						size="xs"
+						mono
+						class="max-w-full break-all"
+						data-testid="contract-address"
+					/>
 				</div>
 				<label class="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
 					Writes are sent from

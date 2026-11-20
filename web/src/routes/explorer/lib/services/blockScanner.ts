@@ -1,15 +1,4 @@
-// Copied from jolly-roger web/src/routes/explorer/lib/services/blockScanner.ts, at commit
-// 8a73e680. Changed here, so the chain is a parameter rather than jolly-roger's generated
-// deployments (`$lib/deployments-store`, which the playground does not have):
-// - the module-level `import {deployments} from '$lib/deployments-store'` and `getChainId()`
-//   (its only use, `deployments.get().chain.id`) are gone;
-// - the six localStorage index helpers and `scanBlocksWithIndex` take `chainId` as their first
-//   parameter instead of calling `getChainId()`;
-// - `scanLatestTransactions` takes a trailing `chainId?: number`, required when `useIndex` is
-//   true (it throws without it); the scan without the index never needed it;
-// - `scanBlocksInBatches` is exported, so a caller can page through older blocks with the same
-//   batching (the playground's `$lib/playground/transactions/transaction-list.ts`).
-// Nothing else is changed.
+// Copied from jolly-roger web/src/routes/explorer/lib/services/blockScanner.ts, at commit a4082a13; nothing below this line is changed.
 import type {PublicClient, Transaction} from 'viem';
 
 /**
@@ -514,8 +503,8 @@ async function scanBlocksWithIndex(
  * @param targetCount - Number of transactions to retrieve (default: 20)
  * @param batchSize - Number of blocks to fetch in parallel (default: 5)
  * @param maxBlocksToScan - Maximum number of blocks to scan (default: 100)
- * @param useIndex - Whether to use localStorage index optimization (default: false)
- * @param chainId - The chain the index is kept for; required when useIndex is true
+ * @param useIndex - Whether to use localStorage index optimization (default: false);
+ *   the index is kept per chain, the client's (its `chain`, else `getChainId()`)
  * @returns Array of transaction summaries
  */
 export async function scanLatestTransactions(
@@ -524,12 +513,11 @@ export async function scanLatestTransactions(
 	batchSize: number = 5,
 	maxBlocksToScan: number = 100,
 	useIndex: boolean = false,
-	chainId?: number,
 ): Promise<TransactionSummary[]> {
 	if (useIndex) {
-		if (chainId === undefined) {
-			throw new Error('scanLatestTransactions: useIndex needs the chainId');
-		}
+		// The client's own chain, so the index can never mix two chains' blocks
+		// under one key.
+		const chainId = publicClient.chain?.id ?? (await publicClient.getChainId());
 		const result = await scanBlocksWithIndex(
 			chainId,
 			publicClient,
