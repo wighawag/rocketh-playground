@@ -2,27 +2,11 @@
 title: 'Open in playground: a sample on rocketh.dev opens in the playground, as a project that is known to deploy'
 slug: open-in-playground
 humanOnly: true
-needsAnswers: true
 ---
 
 > Launch snapshot: records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) and the code; remaining work: `work/tasks/ready/` tasks. (The technical-detail sections below are trimmed by `to-task` once the work is tasked: they move into tasks or ADRs, and this spec settles to its durable framing of Problem, Solution, User Stories and Out of Scope.)
 
 This follows a decision in `work/specs/tasked/rocketh-playground.md` ("Open in playground" on rocketh.dev comes right after v1). It spans three repositories: rocketh (the documentation's content), rocketh-website (the site that renders it) and this one. It lives here because the decision it follows does. `humanOnly` because tasking it means cutting tasks in all three.
-
-<!-- open-questions -->
-
-## Open questions
-
-1. **What the link carries.** Recommendation: (a).
-   - (a) A new encoding of the `project` key, `2.`, meaning "the starting project, with these files over it". Links stay small, and rocketh-website needs no copy of the template. The playground already knows its starting project (`web/project-template/`, the published hardhat-deploy template).
-   - (b) The existing `1.` encoding, the whole project. rocketh-website would then need the template's files at build time, in the version this playground pins, and the link would be larger.
-   - (c) `#example=<name>`, with the playground fetching the files from rocketh.dev. The smallest link, but a new fetch surface, and a link outlives only as long as the example does.
-2. **Where the link encoder lives.** It is about forty lines (`web/src/lib/playground/project/share-link.ts`: JSON, deflated with `fflate`, base64url without padding, a version prefix). Recommendation: rocketh-website keeps its own copy, held to this one by a shared test vector (a fixed set of files and the exact link value both must produce). The alternative is a small package published from this repository. rocketh-website does not depend on `fflate` today (`web/package.json`), so either way it gains a dependency, which needs approval there.
-3. **Where the example projects live, and how a sample names one.** Recommendation: in rocketh, as `examples/playground/<name>/`, each holding only the files that differ from the starting project (`contracts/*.sol`, `deploy/*.ts`, and `rocketh/config.ts` when the example needs another extension). A marked sample names both the example and the file, for example ` ```typescript playground=proxies/deploy/01_deploy_greetings_registry.ts `, and its body must equal that file byte for byte, so the page and the example cannot drift.
-4. **Where the check runs.** Recommendation: in rocketh's CI, as a docs test beside `test:docs:hardhat-deploy-init` (`scripts/test-doc.sh`). For each example: the published `hardhat-deploy init` template in a temporary folder, the example's files over it, `pnpm hardhat compile`, `pnpm hardhat deploy` on the in-memory network. This is what this repository's `pnpm test:export` already proves equivalent to a run in the playground (`test/export/installs-and-deploys.export.ts`). The alternative is running this playground's own pipeline in Node, which is closer to the tab but means publishing it.
-5. **The first batch of samples** (see "What the documentation holds today" below). Which pages first?
-
-<!-- /open-questions -->
 
 ## Problem Statement
 
@@ -60,13 +44,23 @@ A sample on rocketh.dev that stands for a file of a small example project gets a
 
 ## Implementation Decisions
 
-- **Opening reuses the shared-link path** (`project/open-link.ts`, `session.open()`, the confirmation over a saved project, the `project` key removed from the URL after loading). What is new is the encoding of question 1, and selecting the named file.
-- **A link from rocketh.dev opens what the playground's pinned release runs.** The check of question 4 runs the latest published template and packages, and this playground follows releases daily (`.github/workflows/follow-rocketh-releases.yml`), so the two can differ by up to a day after a release. Accepted, and stated in the docs page that explains the button.
+Answered by the maintainer on 2026-11-20, taking the recommendation each time:
+
+- **The link carries the starting project with files over it.** A new encoding of the `project` key, `2.`, holds only the example's files; the playground applies them over its starting project (`web/project-template/`, the published hardhat-deploy template). Considered and not taken: the whole project in the existing `1.` encoding (rocketh-website would need the template's files in the version this playground pins, and links grow), and `#example=<name>` fetched from rocketh.dev (a new fetch surface, and a link that lives only as long as the example).
+- **The encoder is copied, not published.** rocketh-website keeps its own copy of the encoding (about forty lines today in `web/src/lib/playground/project/share-link.ts`: JSON, deflated with `fflate`, base64url without padding, the version prefix), held to this repository's by a shared test vector: a fixed set of files and the exact link value both must produce. rocketh-website gains `fflate` as a dependency, which is approved with this answer.
+- **Examples live in rocketh**, as `examples/playground/<name>/`, each holding only the files that differ from the starting project (`contracts/*.sol`, `deploy/*.ts`, and `rocketh/config.ts` when the example needs another extension). A marked sample names the example and the file in its info string, for example ` ```typescript playground=proxies/deploy/01_deploy_greetings_registry.ts `, and its body must equal that file byte for byte.
+- **The check runs in rocketh's CI**, as a docs test beside `test:docs:hardhat-deploy-init` (`scripts/test-doc.sh`): for each example, the published `hardhat-deploy init` template in a temporary folder, the example's files over it, `pnpm hardhat compile`, `pnpm hardhat deploy` on the in-memory network. This repository's `pnpm test:export` (`test/export/installs-and-deploys.export.ts`) is what makes that equivalent to a run in the tab.
+- **The first batch** is the pages whose samples need only the extensions the starting config registers (`@rocketh/deploy`, `@rocketh/read-execute`, `@rocketh/viem`): `documentation/deploy-scripts/`, `documentation/deploy-contracts/`, `documentation/deterministic-addresses/`, `documentation/viem/` and `hardhat-deploy/typed-artifacts/`. Proxies, routers and diamonds come second, once it is checked that the playground's runner resolves `@rocketh/proxy` and `@rocketh/diamond` (`web/src/lib/playground/runner/bare-modules.ts`).
+
+Also decided:
+
+- **Opening reuses the shared-link path** (`project/open-link.ts`, `session.open()`, the confirmation over a saved project, the `project` key removed from the URL after loading). What is new is the `2.` encoding, and selecting the named file.
+- **A link from rocketh.dev opens what the playground's pinned release runs.** The rocketh CI check runs the latest published template and packages, and this playground follows releases daily (`.github/workflows/follow-rocketh-releases.yml`), so the two can differ by up to a day after a release. Accepted, and stated in the docs page that explains the button.
 - **Size.** An example is a few files; the existing 32 KB fragment cap (`SHARE_FRAGMENT_LIMIT`) applies, and the site build fails on an example whose link would exceed it.
 
 ## Testing Decisions
 
-- rocketh: the example check of question 4 in CI, and a test that every marked fence equals its example file.
+- rocketh: the example check in CI, and a test that every marked fence equals its example file.
 - rocketh-website: the button renders on a marked fence only, and its link decodes (with this repository's decoder, through the shared test vector) to the example's files.
 - This repository: the new encoding round-trips, a link from it opens the starting project with the files over it and the named file selected (e2e), and the shared test vector.
 
