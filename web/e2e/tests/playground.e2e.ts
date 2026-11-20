@@ -288,7 +288,8 @@ test('the Contracts view reads and calls Counter, from the deployer or the admin
 	await expect(mined).toHaveAttribute('data-status', 'success');
 	await expect(mined).toContainText('Transaction mined in block 2');
 	await expect(mined).toContainText('from deployer');
-	await expect(card(page, 'inc').getByTestId('tx-hash')).toHaveText(/^0x[0-9a-f]{64}$/);
+	// jolly-roger's TransactionHash, in full: the hash, then its copy button (no text)
+	await expect(card(page, 'inc').getByTestId('tx-hash')).toHaveText(/^0x[0-9a-f]{64}\s*$/);
 	await expect(page.getByTestId('block')).toHaveText('chain at block 2');
 	await expect(await read(page, 'x')).toHaveText('"1"');
 
@@ -356,7 +357,7 @@ test('the Transactions view lists the deployment and a call from the Contracts v
 	await openContract(page, 'Counter');
 	await send(page, 'inc');
 	await expect(card(page, 'inc').getByTestId('call-transaction')).toHaveAttribute('data-status', 'success');
-	const hash = await card(page, 'inc').getByTestId('tx-hash').textContent();
+	const hash = (await card(page, 'inc').getByTestId('tx-hash').textContent())?.trim();
 	await openTransactions(page);
 	await expect(rows(page)).toHaveCount(2);
 	const call = rows(page).first();
