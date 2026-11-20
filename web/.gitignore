@@ -19,6 +19,7 @@ static/pwa
 # The compiler is fetched and checked by scripts/soljson.mjs, never committed (9 MB).
 # Its LICENSE.txt and README.md beside it are committed.
 static/solc/soljson-*.js
+static/solc/soljson-*.tmp
 
 # The editor's declarations, collected from node_modules by vite.playground.ts on every build.
 src/lib/playground/typescript/generated/
