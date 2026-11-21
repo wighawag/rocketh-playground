@@ -198,4 +198,26 @@ describe('a run', () => {
 		expect(second.transcript).toContain('[script] execute: skipped');
 		expect(sent(second.outcome.requests)).toBe(0);
 	});
+
+	it('runs deployViaRouter when rocketh/config.ts spreads @rocketh/router', async () => {
+		const config = TEMPLATE_FILES['rocketh/config.ts']
+			.replace("import * as viemExtension from '@rocketh/viem';", "import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';")
+			.replace('...viemExtension,', '...viemExtension,\n\t...routerExtension,');
+		expect(config).toContain('...routerExtension,');
+		const files = project({
+			'rocketh/config.ts': config,
+			'deploy/01_deploy_counter.ts':
+				"import {deployScript, artifacts} from '../rocketh/deploy.js';\n\n" +
+				'export default deployScript(\n\tasync ({deployViaRouter, execute, read, namedAccounts}) => {\n' +
+				"\t\tconst counter = await deployViaRouter('Counter', {account: namedAccounts.deployer}, [{name: 'Counter', artifact: artifacts.Counter}]);\n" +
+				"\t\tawait execute(counter, {account: namedAccounts.deployer, functionName: 'incBy', args: [3n]});\n" +
+				"\t\tconsole.log('x:', await read(counter, {functionName: 'x'}));\n\t},\n" +
+				"\t{tags: ['Counter']},\n);\n",
+		});
+		const {outcome, transcript} = await run(files, deps());
+		expect(outcome.error).toBeUndefined();
+		expect(outcome.ok).toBe(true);
+		expect(Object.keys(outcome.deployments).sort()).toEqual(['Counter', 'Counter_Router', 'Counter_Router_Counter_Route']);
+		expect(transcript).toContain('[script] x: 3n');
+	});
 });

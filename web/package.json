@@ -16,6 +16,7 @@
 		"@rocketh/playground": "0.2.0",
 		"@rocketh/proxy": "0.21.6",
 		"@rocketh/read-execute": "0.23.1",
+		"@rocketh/router": "0.20.5",
 		"@rocketh/signer": "0.20.4",
 		"@rocketh/unknown-signer": "0.20.3",
 		"@rocketh/viem": "0.20.5",

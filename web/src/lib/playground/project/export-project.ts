@@ -5,7 +5,8 @@
  * It is the template's files (`web/project-template/`, the published `hardhat-deploy init`
  * template) with the reader's files over them, and three changes: package.json's `workspace:*`
  * becomes the published hardhat-deploy version, every package the playground also pins gets the
- * playground's version (what ran in the tab is what installs), and the README opens with where
+ * playground's version (what ran in the tab is what installs), a package the project imports that
+ * the template does not depend on is added at that version, and the README opens with where
  * the project comes from, the commands and its licence (MIT, the template's). The deployment
  * records are never in it (their chain only existed in the tab), nor are the test keys (the runner
  * puts them into the config at run time, `runner/compose-config.ts`; no file holds them).
@@ -65,14 +66,69 @@ const DEPENDENCY_SECTIONS = [
 ] as const;
 
 /**
- * The template's package.json as the export ships it. Only versions change: no package is added
- * or removed, and the template's other packages keep its ranges.
+ * The specifiers a module names: `import ... from`, `export ... from`, `import '...'`,
+ * `import('...')` and `require('...')`. Type-only imports count: the downloaded project needs the
+ * package to type the file. Read from the text, not from a transpile, so Download needs nothing
+ * but the files (it works in a session that failed to start, and in node).
+ */
+const SPECIFIER =
+	/\bfrom\s*(['"])([^'"\n]+)\1|\bimport\s*(['"])([^'"\n]+)\3|\b(?:import|require)\s*\(\s*(['"])([^'"\n]+)\5\s*\)/g;
+
+/** `@scope/name` or `name` of a bare specifier; undefined for a relative path, a `node:` builtin or a URL. */
+function packageName(specifier: string): string | undefined {
+	if (/^[./]/.test(specifier) || specifier.includes(':')) return undefined;
+	const parts = specifier.split('/');
+	return parts.slice(0, specifier.startsWith('@') ? 2 : 1).join('/');
+}
+
+/** The packages the project's TypeScript and JavaScript files import, sorted. */
+export function importedPackages(files: ProjectFiles): string[] {
+	const names = new Set<string>();
+	for (const [path, text] of Object.entries(files)) {
+		if (!/\.[cm]?[jt]s$/.test(path)) continue;
+		for (const m of text.matchAll(SPECIFIER)) {
+			const name = packageName(m[2] ?? m[4] ?? m[6]);
+			if (name) names.add(name);
+		}
+	}
+	return [...names].sort();
+}
+
+/**
+ * The template's package.json as the export ships it. Versions change, and a package in
+ * `imported` that the template does not depend on is added at the version in `versions`, in the
+ * section where the template keeps `rocketh` (`dependencies` if it has none), so a project that
+ * uses `@rocketh/router` installs it. Nothing is removed, the template's other packages keep its
+ * ranges, and an imported package `versions` has no version for is not added: the playground did
+ * not run it.
  */
 export function exportedPackageJson(
 	text: string,
 	versions: Record<string, string> = PLAYGROUND_VERSIONS,
+	imported: readonly string[] = [],
 ): string {
 	const pkg = JSON.parse(text) as Record<string, unknown>;
+	const declared = new Set(
+		DEPENDENCY_SECTIONS.flatMap((s) =>
+			Object.keys((pkg[s] as Record<string, string> | undefined) ?? {}),
+		),
+	);
+	const missing = imported.filter(
+		(name) => !declared.has(name) && name in versions,
+	);
+	if (missing.length > 0) {
+		const section =
+			DEPENDENCY_SECTIONS.find((s) =>
+				Object.hasOwn((pkg[s] as object | undefined) ?? {}, 'rocketh'),
+			) ?? 'dependencies';
+		const deps = {...(pkg[section] as Record<string, string> | undefined)};
+		for (const name of missing) deps[name] = versions[name];
+		pkg[section] = Object.fromEntries(
+			Object.keys(deps)
+				.sort()
+				.map((name) => [name, deps[name]]),
+		);
+	}
 	for (const section of DEPENDENCY_SECTIONS) {
 		const deps = pkg[section] as Record<string, string> | undefined;
 		if (!deps) continue;
@@ -147,6 +203,7 @@ export function exportedProject(
 	out['package.json'] = exportedPackageJson(
 		out['package.json'],
 		options.versions,
+		importedPackages(out),
 	);
 	out['README.md'] = readmePreamble(dropped) + (out['README.md'] ?? '');
 	return out;

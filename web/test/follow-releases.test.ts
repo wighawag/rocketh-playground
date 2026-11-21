@@ -13,6 +13,7 @@ import {
 	REGISTRY,
 	type Bump,
 } from '../scripts/follow-releases.mjs';
+import {BARE_MODULE_NAMES} from '../src/lib/playground/runner/bare-modules.js';
 
 /**
  * `scripts/follow-releases.mjs` decides what `.github/workflows/follow-rocketh-releases.yml` bumps.
@@ -86,6 +87,9 @@ describe('what is followed', () => {
 		const names = followedPackages(realPackage).map((p) => p.name);
 		expect(names).toContain('rocketh');
 		expect(names).toContain('@rocketh/core');
+		// every rocketh package the runner resolves is followed, the extensions a project spreads included
+		expect(names).toContain('@rocketh/router');
+		for (const name of BARE_MODULE_NAMES.filter((n) => n === 'rocketh' || n.startsWith('@rocketh/'))) expect(names, name).toContain(name);
 		expect(names.every((n) => n === 'rocketh' || n.startsWith('@rocketh/'))).toBe(true);
 		expect(names).not.toContain('webevm');
 		expect(names).not.toContain('viem');

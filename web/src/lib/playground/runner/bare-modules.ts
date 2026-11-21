@@ -16,6 +16,7 @@ export const BARE_MODULES = {
 	'@rocketh/deploy': () => import('@rocketh/deploy'),
 	'@rocketh/proxy': () => import('@rocketh/proxy'),
 	'@rocketh/diamond': () => import('@rocketh/diamond'),
+	'@rocketh/router': () => import('@rocketh/router'),
 	'@rocketh/read-execute': () => import('@rocketh/read-execute'),
 	'@rocketh/viem': () => import('@rocketh/viem'),
 	'@rocketh/signer': () => import('@rocketh/signer'),
