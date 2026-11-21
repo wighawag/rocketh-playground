@@ -12,13 +12,19 @@
 import type tsModule from 'typescript';
 import {expose, type Endpoint} from 'comlink';
 import {transpileProject} from './transpile.js';
-import {createLanguageService, type LanguageService} from './language-service.js';
+import {
+	createLanguageService,
+	type LanguageService,
+} from './language-service.js';
 import type {Declarations} from './project-options.js';
 import type {ProjectFiles} from '../project/template.js';
 
 export type LoadDeclarations = () => Promise<Declarations>;
 
-export function typeScriptApi(ts: typeof tsModule, loadDeclarations: LoadDeclarations) {
+export function typeScriptApi(
+	ts: typeof tsModule,
+	loadDeclarations: LoadDeclarations,
+) {
 	let service: LanguageService | undefined;
 	let starting: Promise<{loadMs: number; createMs: number}> | undefined;
 	return {
@@ -66,7 +72,10 @@ export function typeScriptApi(ts: typeof tsModule, loadDeclarations: LoadDeclara
 		getLints(args: {path: string; diagnosticCodesToIgnore: number[]}) {
 			return service?.getLints(args) ?? [];
 		},
-		async getAutocompletion(args: {path: string; context: {pos: number; explicit: boolean}}) {
+		async getAutocompletion(args: {
+			path: string;
+			context: {pos: number; explicit: boolean};
+		}) {
 			return (await service?.getAutocompletion(args)) ?? null;
 		},
 		getHover(args: {path: string; pos: number}) {
@@ -77,6 +86,10 @@ export function typeScriptApi(ts: typeof tsModule, loadDeclarations: LoadDeclara
 
 export type TypeScriptWorkerApi = ReturnType<typeof typeScriptApi>;
 
-export function exposeTypeScript(ts: typeof tsModule, loadDeclarations: LoadDeclarations, endpoint?: Endpoint): void {
+export function exposeTypeScript(
+	ts: typeof tsModule,
+	loadDeclarations: LoadDeclarations,
+	endpoint?: Endpoint,
+): void {
 	expose(typeScriptApi(ts, loadDeclarations), endpoint);
 }

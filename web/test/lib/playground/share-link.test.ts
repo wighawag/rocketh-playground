@@ -31,7 +31,11 @@ function incompressible(chars: number): string {
 
 describe('the project in a link', () => {
 	it('round-trips the starting project, unicode and an empty file included', () => {
-		const files = {...startingProject(), 'contracts/Notes.sol': '// é, ü, 你好, 🚀\n', 'deploy/empty.ts': ''};
+		const files = {
+			...startingProject(),
+			'contracts/Notes.sol': '// é, ü, 你好, 🚀\n',
+			'deploy/empty.ts': '',
+		};
 		const value = encodeProject(files);
 		expect(decodeProject(value)).toEqual(files);
 	});
@@ -60,7 +64,10 @@ describe('the project in a link', () => {
 
 	it('gives no link to a project whose encoded fragment is over 32 KB, and says how big it is', () => {
 		expect(SHARE_FRAGMENT_LIMIT).toBe(32 * 1024);
-		const big = {...startingProject(), 'contracts/Big.sol': `// ${incompressible(40_000)}\n`};
+		const big = {
+			...startingProject(),
+			'contracts/Big.sol': `// ${incompressible(40_000)}\n`,
+		};
 		const shared = shareProject(big);
 		expect(shared.ok).toBe(false);
 		if (shared.ok) return;
@@ -72,28 +79,57 @@ describe('the project in a link', () => {
 		// find a size just under and one just over the cap
 		let under: number | undefined;
 		let over: number | undefined;
-		for (let chars = 26_000; chars < 36_000 && over === undefined; chars += 50) {
-			const length = fragmentLength(encodeProject({'contracts/A.sol': incompressible(chars)}));
+		for (
+			let chars = 26_000;
+			chars < 36_000 && over === undefined;
+			chars += 50
+		) {
+			const length = fragmentLength(
+				encodeProject({'contracts/A.sol': incompressible(chars)}),
+			);
 			if (length <= SHARE_FRAGMENT_LIMIT) under = chars;
 			else over = chars;
 		}
 		expect(under).toBeDefined();
 		expect(over).toBeDefined();
-		expect(shareProject({'contracts/A.sol': incompressible(under!)}).ok).toBe(true);
-		expect(shareProject({'contracts/A.sol': incompressible(over!)}).ok).toBe(false);
+		expect(shareProject({'contracts/A.sol': incompressible(under!)}).ok).toBe(
+			true,
+		);
+		expect(shareProject({'contracts/A.sol': incompressible(over!)}).ok).toBe(
+			false,
+		);
 	});
 
 	it('refuses a corrupted, a truncated, an empty or a foreign value, with a reason', () => {
 		const value = encodeProject(startingProject());
-		const corrupted = value.slice(0, 40) + (value[40] === 'A' ? 'B' : 'A') + value.slice(41);
-		for (const bad of [corrupted, value.slice(0, Math.floor(value.length / 2)), '', '1.', 'hello', '2.' + value.slice(2), '1.!!!']) {
+		const corrupted =
+			value.slice(0, 40) + (value[40] === 'A' ? 'B' : 'A') + value.slice(41);
+		for (const bad of [
+			corrupted,
+			value.slice(0, Math.floor(value.length / 2)),
+			'',
+			'1.',
+			'hello',
+			'2.' + value.slice(2),
+			'1.!!!',
+		]) {
 			expect(() => decodeProject(bad)).toThrow(ShareLinkError);
 		}
 	});
 
 	it('refuses a link whose content is not a set of project files', () => {
 		const encode = (content: unknown) => encodeProject(content as never);
-		for (const content of [[], {}, 'text', {'a.ts': 1}, {'/etc/passwd': 'x'}, {'../outside.ts': 'x'}, {'deploy/../../x.ts': 'x'}, {'a\\b.ts': 'x'}, {'deployments/playground/A.json': '{}'}]) {
+		for (const content of [
+			[],
+			{},
+			'text',
+			{'a.ts': 1},
+			{'/etc/passwd': 'x'},
+			{'../outside.ts': 'x'},
+			{'deploy/../../x.ts': 'x'},
+			{'a\\b.ts': 'x'},
+			{'deployments/playground/A.json': '{}'},
+		]) {
 			expect(() => decodeProject(encode(content))).toThrow(ShareLinkError);
 		}
 	});

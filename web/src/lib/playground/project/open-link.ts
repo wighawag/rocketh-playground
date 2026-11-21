@@ -68,10 +68,14 @@ export type LinkOpenerOptions = {
 
 const sameFiles = (a: ProjectFiles, b: ProjectFiles) => {
 	const keys = Object.keys(a);
-	return keys.length === Object.keys(b).length && keys.every((k) => k in b && a[k] === b[k]);
+	return (
+		keys.length === Object.keys(b).length &&
+		keys.every((k) => k in b && a[k] === b[k])
+	);
 };
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const messageOf = (error: unknown) =>
+	error instanceof Error ? error.message : String(error);
 
 /** Resolves with the session's phase once it is `ready` or `failed`. */
 function settled(session: OpenableSession): Promise<Phase> {
@@ -118,7 +122,10 @@ export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 		let shareLink: typeof import('./share-link.js') | undefined;
 		try {
 			shareLink = await import('./share-link.js');
-			({files, select: selected} = shareLink.decodeLink(options.value, {starting, bare}));
+			({files, select: selected} = shareLink.decodeLink(options.value, {
+				starting,
+				bare,
+			}));
 		} catch (error) {
 			if (shareLink && error instanceof shareLink.NewerLinkError) {
 				// kept in the URL: a reload may get a playground new enough to open it
@@ -151,7 +158,8 @@ export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 
 	function dismiss() {
 		const {status} = get(store);
-		if (status === 'invalid' || status === 'failed') store.set({status: 'none'});
+		if (status === 'invalid' || status === 'failed')
+			store.set({status: 'none'});
 	}
 
 	return {subscribe: store.subscribe, begin, confirm, cancel, dismiss};

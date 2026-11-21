@@ -39,7 +39,9 @@ import {bigIntReplacer, errorMessage} from '../../core/utils/format/index.js';
 import {CHAIN_ID} from '../runner/compose-config.js';
 import {TEST_KEYS} from '../runner/test-keys.js';
 
-export type RequestProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
+export type RequestProvider = {
+	request(args: {method: string; params?: unknown}): Promise<unknown>;
+};
 
 export type ContractTarget = {address: `0x${string}`; abi: Abi};
 
@@ -61,7 +63,13 @@ export const inTabChain = defineChain({
 });
 
 function transport(provider: RequestProvider) {
-	return custom({request: (args: {method: string; params?: unknown}) => provider.request(args)}, {retryCount: 0});
+	return custom(
+		{
+			request: (args: {method: string; params?: unknown}) =>
+				provider.request(args),
+		},
+		{retryCount: 0},
+	);
 }
 
 /** The function, and the contract's errors, so a custom error is decoded by name. */
@@ -76,7 +84,10 @@ export async function readFunction(params: {
 	inputValues: Record<string, string>;
 }): Promise<unknown> {
 	const {provider, abiItem, contract, inputValues} = params;
-	const publicClient = createPublicClient({chain: inTabChain, transport: transport(provider)});
+	const publicClient = createPublicClient({
+		chain: inTabChain,
+		transport: transport(provider),
+	});
 	const args = convertInputValues(abiItem.inputs, inputValues);
 	return publicClient.readContract({
 		address: contract.address,
@@ -110,13 +121,23 @@ export async function writeFunction(params: {
 		args: args as never,
 	} as never);
 	// Mined already (automine, above): a missing receipt means the node was set up otherwise.
-	const receipt = await publicClient.getTransactionReceipt({hash}).catch(() => undefined);
+	const receipt = await publicClient
+		.getTransactionReceipt({hash})
+		.catch(() => undefined);
 	if (!receipt) throw new Error(`sent ${hash}, but the chain has not mined it`);
-	return {hash, status: receipt.status, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, from: account.address};
+	return {
+		hash,
+		status: receipt.status,
+		blockNumber: receipt.blockNumber,
+		gasUsed: receipt.gasUsed,
+		from: account.address,
+	};
 }
 
 function formatArg(value: unknown): string {
-	return typeof value === 'bigint' ? value.toString() : JSON.stringify(value, bigIntReplacer);
+	return typeof value === 'bigint'
+		? value.toString()
+		: JSON.stringify(value, bigIntReplacer);
 }
 
 /**
@@ -126,12 +147,16 @@ function formatArg(value: unknown): string {
  */
 export function callErrorMessage(error: unknown): string {
 	if (error instanceof BaseError) {
-		const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
+		const reverted = error.walk(
+			(e) => e instanceof ContractFunctionRevertedError,
+		);
 		if (reverted instanceof ContractFunctionRevertedError) {
 			// viem sets `reason` for `Error(string)` and `Panic` only; a custom error is in `data`
 			if (reverted.reason) return `reverted: ${reverted.reason}`;
-			if (reverted.data) return `reverted: ${reverted.data.errorName}(${(reverted.data.args ?? []).map(formatArg).join(', ')})`;
-			if (reverted.signature) return `reverted with an error the ABI does not declare (${reverted.signature})`;
+			if (reverted.data)
+				return `reverted: ${reverted.data.errorName}(${(reverted.data.args ?? []).map(formatArg).join(', ')})`;
+			if (reverted.signature)
+				return `reverted with an error the ABI does not declare (${reverted.signature})`;
 			return 'reverted, with no reason given';
 		}
 		return error.shortMessage;

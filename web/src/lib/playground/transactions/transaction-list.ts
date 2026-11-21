@@ -31,14 +31,24 @@ import {contractsFromRecords} from '../contracts/records.js';
 import {STATE_HISTORY_BLOCKS} from '../runner/compose-config.js';
 import type {ProjectFiles} from '../project/template.js';
 import type {ChainProvider} from '../session.js';
-import {decodeRow, loadRow, type DecodeContext, type RawTransaction, type TransactionRow} from './decode.js';
+import {
+	decodeRow,
+	loadRow,
+	type DecodeContext,
+	type RawTransaction,
+	type TransactionRow,
+} from './decode.js';
 
 export const PAGE_BLOCKS = 20;
 /** Blocks fetched at once, as jolly-roger's list does. */
 const BATCH_SIZE = 5;
 
 /** What the list needs of the session. */
-export type TransactionsSource = Readable<{blockNumber?: number; records: ProjectFiles; namedAccounts?: Record<string, string>}> & {
+export type TransactionsSource = Readable<{
+	blockNumber?: number;
+	records: ProjectFiles;
+	namedAccounts?: Record<string, string>;
+}> & {
 	provider(): ChainProvider | undefined;
 };
 
@@ -60,22 +70,37 @@ export type TransactionList = Readable<TransactionListState> & {
 	older(): Promise<void>;
 };
 
-const initial: TransactionListState = {rows: [], status: 'loading', hasOlder: false, loadingOlder: false};
+const initial: TransactionListState = {
+	rows: [],
+	status: 'loading',
+	hasOlder: false,
+	loadingOlder: false,
+};
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const messageOf = (error: unknown) =>
+	error instanceof Error ? error.message : String(error);
 
-const newestFirst = (a: TransactionRow, b: TransactionRow) => b.blockNumber - a.blockNumber || b.transactionIndex - a.transactionIndex;
+const newestFirst = (a: TransactionRow, b: TransactionRow) =>
+	b.blockNumber - a.blockNumber || b.transactionIndex - a.transactionIndex;
 
 export function createTransactionList(
 	source: TransactionsSource,
-	options: {pageBlocks?: number; /** The node's `stateHistory` window. */ stateHistoryBlocks?: number} = {},
+	options: {
+		pageBlocks?: number;
+		/** The node's `stateHistory` window. */ stateHistoryBlocks?: number;
+	} = {},
 ): TransactionList {
 	const pageBlocks = options.pageBlocks ?? PAGE_BLOCKS;
 	const stateHistoryBlocks = options.stateHistoryBlocks ?? STATE_HISTORY_BLOCKS;
 	let state = initial;
-	let latest: {blockNumber?: number; records: ProjectFiles; namedAccounts?: Record<string, string>} = {records: {}};
+	let latest: {
+		blockNumber?: number;
+		records: ProjectFiles;
+		namedAccounts?: Record<string, string>;
+	} = {records: {}};
 	/** What the rows were decoded with, to decode them again when it changes. */
-	let decodedWith: {records: ProjectFiles; namedAccounts?: Record<string, string>} | undefined;
+	let decodedWith:
+		{records: ProjectFiles; namedAccounts?: Record<string, string>} | undefined;
 	const raw = new Map<`0x${string}`, RawTransaction>();
 	let client: {provider: ChainProvider; publicClient: PublicClient} | undefined;
 
@@ -94,7 +119,11 @@ export function createTransactionList(
 	// One job at a time: a page read and a catch-up never interleave.
 	let queue: Promise<void> = Promise.resolve();
 	function enqueue(job: () => Promise<void>): Promise<void> {
-		queue = queue.then(job).catch((error) => set({status: 'failed', error: messageOf(error), loadingOlder: false}));
+		queue = queue
+			.then(job)
+			.catch((error) =>
+				set({status: 'failed', error: messageOf(error), loadingOlder: false}),
+			);
 		return queue;
 	}
 
@@ -102,33 +131,64 @@ export function createTransactionList(
 		const provider = source.provider();
 		if (!provider) return undefined;
 		if (client?.provider !== provider) {
-			const transport = custom({request: (args: {method: string; params?: unknown}) => provider.request(args)}, {retryCount: 0});
-			client = {provider, publicClient: createPublicClient({chain: inTabChain, transport}) as PublicClient};
+			const transport = custom(
+				{
+					request: (args: {method: string; params?: unknown}) =>
+						provider.request(args),
+				},
+				{retryCount: 0},
+			);
+			client = {
+				provider,
+				publicClient: createPublicClient({
+					chain: inTabChain,
+					transport,
+				}) as PublicClient,
+			};
 		}
 		return client.publicClient;
 	}
 
 	function context(publicClient: PublicClient, head: number): DecodeContext {
-		return {publicClient, contracts: contractsFromRecords(latest.records), namedAccounts: latest.namedAccounts, head, stateHistoryBlocks};
+		return {
+			publicClient,
+			contracts: contractsFromRecords(latest.records),
+			namedAccounts: latest.namedAccounts,
+			head,
+			stateHistoryBlocks,
+		};
 	}
 
 	/** The transactions of `numbers`, read and decoded; the ones already read are skipped. */
-	async function read(publicClient: PublicClient, numbers: number[], head: number): Promise<TransactionRow[]> {
+	async function read(
+		publicClient: PublicClient,
+		numbers: number[],
+		head: number,
+	): Promise<TransactionRow[]> {
 		if (numbers.length === 0) return [];
-		const summaries = await scanBlocksInBatches(publicClient, numbers.map(BigInt), BATCH_SIZE);
+		const summaries = await scanBlocksInBatches(
+			publicClient,
+			numbers.map(BigInt),
+			BATCH_SIZE,
+		);
 		const rows: TransactionRow[] = [];
 		for (const summary of summaries) {
 			const hash = summary.hash as `0x${string}`;
 			if (raw.has(hash)) continue;
 			const tx = await publicClient.getTransaction({hash});
-			const loaded = await loadRow(tx, summary.timestamp, context(publicClient, head));
+			const loaded = await loadRow(
+				tx,
+				summary.timestamp,
+				context(publicClient, head),
+			);
 			raw.set(hash, loaded.raw);
 			rows.push(loaded.row);
 		}
 		return rows;
 	}
 
-	const range = (from: number, to: number) => Array.from({length: Math.max(0, from - to + 1)}, (_, i) => from - i);
+	const range = (from: number, to: number) =>
+		Array.from({length: Math.max(0, from - to + 1)}, (_, i) => from - i);
 
 	async function update() {
 		const publicClient_ = publicClient();
@@ -136,34 +196,77 @@ export function createTransactionList(
 		if (!publicClient_ || head === undefined) return;
 
 		// the records or the names changed: what is already read is decoded again
-		if (decodedWith && (decodedWith.records !== latest.records || decodedWith.namedAccounts !== latest.namedAccounts)) {
+		if (
+			decodedWith &&
+			(decodedWith.records !== latest.records ||
+				decodedWith.namedAccounts !== latest.namedAccounts)
+		) {
 			const ctx = context(publicClient_, state.head ?? head);
-			const rows = await Promise.all(state.rows.map((row) => decodeRow(raw.get(row.hash)!, ctx)));
+			const rows = await Promise.all(
+				state.rows.map((row) => decodeRow(raw.get(row.hash)!, ctx)),
+			);
 			set({rows});
 		}
-		decodedWith = {records: latest.records, namedAccounts: latest.namedAccounts};
+		decodedWith = {
+			records: latest.records,
+			namedAccounts: latest.namedAccounts,
+		};
 		if (head === state.head) return;
 
-		const fresh = state.head === undefined || head < state.head || head - state.head > pageBlocks;
+		const fresh =
+			state.head === undefined ||
+			head < state.head ||
+			head - state.head > pageBlocks;
 		if (fresh) {
 			raw.clear();
 			const oldest = Math.max(1, head - pageBlocks + 1);
 			const rows = await read(publicClient_, range(head, oldest), head);
-			set({rows: rows.sort(newestFirst), status: 'ready', error: undefined, head, oldestBlock: oldest, hasOlder: oldest > 1});
+			set({
+				rows: rows.sort(newestFirst),
+				status: 'ready',
+				error: undefined,
+				head,
+				oldestBlock: oldest,
+				hasOlder: oldest > 1,
+			});
 		} else {
-			const rows = await read(publicClient_, range(head, state.head! + 1), head);
-			set({rows: [...rows, ...state.rows].sort(newestFirst), status: 'ready', error: undefined, head});
+			const rows = await read(
+				publicClient_,
+				range(head, state.head! + 1),
+				head,
+			);
+			set({
+				rows: [...rows, ...state.rows].sort(newestFirst),
+				status: 'ready',
+				error: undefined,
+				head,
+			});
 		}
 	}
 
 	function older(): Promise<void> {
 		return enqueue(async () => {
 			const publicClient_ = publicClient();
-			if (!publicClient_ || !state.hasOlder || state.oldestBlock === undefined || state.head === undefined) return;
+			if (
+				!publicClient_ ||
+				!state.hasOlder ||
+				state.oldestBlock === undefined ||
+				state.head === undefined
+			)
+				return;
 			set({loadingOlder: true});
 			const oldest = Math.max(1, state.oldestBlock - pageBlocks);
-			const rows = await read(publicClient_, range(state.oldestBlock - 1, oldest), state.head);
-			set({rows: [...state.rows, ...rows].sort(newestFirst), oldestBlock: oldest, hasOlder: oldest > 1, loadingOlder: false});
+			const rows = await read(
+				publicClient_,
+				range(state.oldestBlock - 1, oldest),
+				state.head,
+			);
+			set({
+				rows: [...state.rows, ...rows].sort(newestFirst),
+				oldestBlock: oldest,
+				hasOlder: oldest > 1,
+				loadingOlder: false,
+			});
 		});
 	}
 
@@ -173,7 +276,9 @@ export function createTransactionList(
 const lists = new WeakMap<TransactionsSource, TransactionList>();
 
 /** The session's list, made on first use and kept, so a view shown again starts from it. */
-export function transactionListFor(source: TransactionsSource): TransactionList {
+export function transactionListFor(
+	source: TransactionsSource,
+): TransactionList {
 	let list = lists.get(source);
 	if (!list) {
 		list = createTransactionList(source);

@@ -21,7 +21,9 @@ const DEFAULT_NAME = 'deployer';
 
 /** The test key index for an address, or -1 when no test key signs for it. */
 export function testKeyIndex(address: string): number {
-	return TEST_ADDRESSES.findIndex((a) => a.toLowerCase() === address.toLowerCase());
+	return TEST_ADDRESSES.findIndex(
+		(a) => a.toLowerCase() === address.toLowerCase(),
+	);
 }
 
 /**
@@ -29,7 +31,9 @@ export function testKeyIndex(address: string): number {
  * head: it is the one a write is sent from by default. A named account rocketh resolved to an
  * address no test key signs for is left out, since nothing could sign for it.
  */
-export function signingAccounts(namedAccounts: Record<string, string> | undefined): SigningAccount[] {
+export function signingAccounts(
+	namedAccounts: Record<string, string> | undefined,
+): SigningAccount[] {
 	const named: SigningAccount[] = [];
 	const taken = new Set<number>();
 	for (const [name, address] of Object.entries(namedAccounts ?? {})) {
@@ -43,10 +47,13 @@ export function signingAccounts(namedAccounts: Record<string, string> | undefine
 		named.push({label: name, address: TEST_ADDRESSES[keyIndex], keyIndex});
 		taken.add(keyIndex);
 	}
-	const isDefault = (a: SigningAccount) => Number(a.label.split(', ').includes(DEFAULT_NAME));
+	const isDefault = (a: SigningAccount) =>
+		Number(a.label.split(', ').includes(DEFAULT_NAME));
 	named.sort((a, b) => isDefault(b) - isDefault(a));
 	const unnamed = TEST_ADDRESSES.flatMap((address, keyIndex) =>
-		taken.has(keyIndex) ? [] : [{label: `account ${keyIndex}`, address, keyIndex}],
+		taken.has(keyIndex)
+			? []
+			: [{label: `account ${keyIndex}`, address, keyIndex}],
 	);
 	return [...named, ...unnamed];
 }

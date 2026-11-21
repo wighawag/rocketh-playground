@@ -6,8 +6,16 @@ import {chain, prepare, project, run, sent} from './helpers.js';
 import {describe, it, expect, beforeEach} from 'vitest';
 import {createVFSDeploymentStore} from '@rocketh/web';
 import {privateKeyToAccount} from 'viem/accounts';
-import {STARTING_PROJECT_PATHS, TEMPLATE_FILES, TEMPLATE_SOURCE, startingProject} from '../../../src/lib/playground/project/template.js';
-import {TEST_ADDRESSES, TEST_KEYS} from '../../../src/lib/playground/runner/test-keys.js';
+import {
+	STARTING_PROJECT_PATHS,
+	TEMPLATE_FILES,
+	TEMPLATE_SOURCE,
+	startingProject,
+} from '../../../src/lib/playground/project/template.js';
+import {
+	TEST_ADDRESSES,
+	TEST_KEYS,
+} from '../../../src/lib/playground/runner/test-keys.js';
 
 const RECORD = 'deployments/playground/Counter.json';
 const CHAIN_FILE = 'deployments/playground/.chain';
@@ -16,13 +24,20 @@ describe('the starting project', () => {
 	it('is the published template, unedited', () => {
 		expect(TEMPLATE_SOURCE.package).toBe('hardhat-deploy');
 		const files = startingProject();
-		expect(Object.keys(files).sort()).toEqual([...STARTING_PROJECT_PATHS].sort());
-		for (const path of STARTING_PROJECT_PATHS) expect(files[path]).toBe(TEMPLATE_FILES[path]);
-		expect(files['rocketh/config.ts']).toContain("import * as unknownSignerExtension from '@rocketh/unknown-signer'");
+		expect(Object.keys(files).sort()).toEqual(
+			[...STARTING_PROJECT_PATHS].sort(),
+		);
+		for (const path of STARTING_PROJECT_PATHS)
+			expect(files[path]).toBe(TEMPLATE_FILES[path]);
+		expect(files['rocketh/config.ts']).toContain(
+			"import * as unknownSignerExtension from '@rocketh/unknown-signer'",
+		);
 	});
 
 	it('labels its test keys with the addresses they sign for', () => {
-		expect(TEST_KEYS.map((k) => privateKeyToAccount(k).address)).toEqual([...TEST_ADDRESSES]);
+		expect(TEST_KEYS.map((k) => privateKeyToAccount(k).address)).toEqual([
+			...TEST_ADDRESSES,
+		]);
 	});
 });
 
@@ -30,32 +45,57 @@ describe('compile and transpile', () => {
 	it('compiles Counter.sol and generates the artifacts the template imports', async () => {
 		const {compiled, transpiled} = await prepare(project());
 		expect(compiled.ok).toBe(true);
-		expect(compiled.artifacts['generated/artifacts/index.js']).toContain("export {Artifact_Counter as Counter} from './Counter.js';");
+		expect(compiled.artifacts['generated/artifacts/index.js']).toContain(
+			"export {Artifact_Counter as Counter} from './Counter.js';",
+		);
 		expect(transpiled.ok).toBe(true);
 		// a type-only import is erased, so it is not something the runner has to provide
-		expect(transpiled.imports['rocketh/config.ts']).not.toContain('rocketh/types');
+		expect(transpiled.imports['rocketh/config.ts']).not.toContain(
+			'rocketh/types',
+		);
 		expect(transpiled.imports['rocketh/deploy.ts']).toEqual(
-			expect.arrayContaining(['./config.js', '../generated/artifacts/index.js', 'rocketh']),
+			expect.arrayContaining([
+				'./config.js',
+				'../generated/artifacts/index.js',
+				'rocketh',
+			]),
 		);
 	});
 
 	it('reports a Solidity error with its file and line', async () => {
-		const broken = TEMPLATE_FILES['contracts/Counter.sol'].replace('x++;', 'x++');
-		const {compiled} = await prepare(project({'contracts/Counter.sol': broken}));
+		const broken = TEMPLATE_FILES['contracts/Counter.sol'].replace(
+			'x++;',
+			'x++',
+		);
+		const {compiled} = await prepare(
+			project({'contracts/Counter.sol': broken}),
+		);
 		expect(compiled.ok).toBe(false);
 		const error = compiled.diagnostics.find((d) => d.severity === 'error');
 		// solc reports a missing `;` at the token after it: `emit`, on the next line
-		expect(error).toMatchObject({file: 'contracts/Counter.sol', line: 11, source: 'solc'});
+		expect(error).toMatchObject({
+			file: 'contracts/Counter.sol',
+			line: 11,
+			source: 'solc',
+		});
 		expect(error?.message).toContain("Expected ';'");
 		expect(compiled.artifacts).toEqual({});
 	});
 
 	it('reports a TypeScript syntax error with its file and line', async () => {
 		const {transpiled} = await prepare(
-			project({'deploy/02_broken.ts': "import {deployScript} from '../rocketh/deploy.js';\n\nconst x = ;\n"}),
+			project({
+				'deploy/02_broken.ts':
+					"import {deployScript} from '../rocketh/deploy.js';\n\nconst x = ;\n",
+			}),
 		);
 		expect(transpiled.ok).toBe(false);
-		expect(transpiled.diagnostics[0]).toMatchObject({file: 'deploy/02_broken.ts', line: 3, column: 11, source: 'typescript'});
+		expect(transpiled.diagnostics[0]).toMatchObject({
+			file: 'deploy/02_broken.ts',
+			line: 3,
+			column: 11,
+			source: 'typescript',
+		});
 	});
 });
 
@@ -76,10 +116,15 @@ describe('a run', () => {
 		expect(deploymentStore.vfs.paths()).toEqual([CHAIN_FILE, RECORD]);
 		const record = JSON.parse(deploymentStore.vfs.read(RECORD));
 		expect(record.address).toBe(outcome.deployments.Counter);
-		const code = (await node.request({method: 'eth_getCode', params: [record.address, 'latest']} as never)) as string;
+		const code = (await node.request({
+			method: 'eth_getCode',
+			params: [record.address, 'latest'],
+		} as never)) as string;
 		expect(code.length).toBeGreaterThan(2);
 		expect(transcript).toContain('[rocketh] - Executing 01_deploy_counter.ts');
-		expect(transcript.some((line) => line.includes('Deploying Counter'))).toBe(true);
+		expect(transcript.some((line) => line.includes('Deploying Counter'))).toBe(
+			true,
+		);
 	});
 
 	it('sends nothing when nothing changed, and the transcript says so', async () => {
@@ -87,15 +132,25 @@ describe('a run', () => {
 		const {outcome, transcript} = await run(project(), deps());
 		expect(outcome.ok).toBe(true);
 		expect(sent(outcome.requests)).toBe(0);
-		expect(transcript.some((line) => line.includes('reusing "Counter"'))).toBe(true);
+		expect(transcript.some((line) => line.includes('reusing "Counter"'))).toBe(
+			true,
+		);
 	});
 
 	it('redeploys an edited contract', async () => {
 		const first = await run(project(), deps());
-		const edited = TEMPLATE_FILES['contracts/Counter.sol'].replace('increment should be positive', 'the increment must be positive');
-		const second = await run(project({'contracts/Counter.sol': edited}), deps());
+		const edited = TEMPLATE_FILES['contracts/Counter.sol'].replace(
+			'increment should be positive',
+			'the increment must be positive',
+		);
+		const second = await run(
+			project({'contracts/Counter.sol': edited}),
+			deps(),
+		);
 		expect(sent(second.outcome.requests)).toBe(1);
-		expect(second.outcome.deployments.Counter).not.toBe(first.outcome.deployments.Counter);
+		expect(second.outcome.deployments.Counter).not.toBe(
+			first.outcome.deployments.Counter,
+		);
 	});
 
 	it('resolves viem subpaths', async () => {
@@ -121,7 +176,9 @@ describe('a run', () => {
 		);
 		expect(outcome.ok).toBe(false);
 		expect(outcome.error?.name).toBe('UnsupportedImportError');
-		expect(outcome.error?.message).toContain('deploy/02_bad.ts imports "lodash"');
+		expect(outcome.error?.message).toContain(
+			'deploy/02_bad.ts imports "lodash"',
+		);
 		expect(outcome.error?.message).toContain('@rocketh/unknown-signer');
 		expect(outcome.error?.message).toContain('viem/accounts');
 		expect(outcome.requests).toEqual({});
@@ -130,11 +187,16 @@ describe('a run', () => {
 
 	it('refuses an import of a file the project does not have', async () => {
 		const {outcome} = await run(
-			project({'deploy/02_bad.ts': "import {x} from './missing.js';\nexport default x;\n"}),
+			project({
+				'deploy/02_bad.ts':
+					"import {x} from './missing.js';\nexport default x;\n",
+			}),
 			deps(),
 		);
 		expect(outcome.error?.name).toBe('MissingFileError');
-		expect(outcome.error?.message).toBe('deploy/02_bad.ts imports "./missing.js", and the project has no such file.');
+		expect(outcome.error?.message).toBe(
+			'deploy/02_bad.ts imports "./missing.js", and the project has no such file.',
+		);
 	});
 
 	it('reports a script that throws', async () => {
@@ -172,12 +234,17 @@ describe('a run', () => {
 			deps(),
 		);
 		expect(outcome.ok).toBe(false);
-		expect(outcome.error?.message).toContain('incBy: increment should be positive');
+		expect(outcome.error?.message).toContain(
+			'incBy: increment should be positive',
+		);
 	});
 
 	it('runs deployViaProxy and a guarded execute with the extensions rocketh/config.ts spreads', async () => {
 		const config = TEMPLATE_FILES['rocketh/config.ts']
-			.replace("import * as viemExtension from '@rocketh/viem';", "import * as viemExtension from '@rocketh/viem';\nimport * as proxyExtension from '@rocketh/proxy';")
+			.replace(
+				"import * as viemExtension from '@rocketh/viem';",
+				"import * as viemExtension from '@rocketh/viem';\nimport * as proxyExtension from '@rocketh/proxy';",
+			)
 			.replace('...viemExtension,', '...viemExtension,\n\t...proxyExtension,');
 		expect(config).toContain('...proxyExtension,');
 		const files = project({
@@ -193,7 +260,11 @@ describe('a run', () => {
 		const first = await run(files, deps());
 		expect(first.outcome.error).toBeUndefined();
 		expect(first.transcript).toContain('[script] execute: sent');
-		expect(Object.keys(first.outcome.deployments).sort()).toEqual(['Counter', 'Counter_Implementation', 'Counter_Proxy']);
+		expect(Object.keys(first.outcome.deployments).sort()).toEqual([
+			'Counter',
+			'Counter_Implementation',
+			'Counter_Proxy',
+		]);
 		const second = await run(files, deps());
 		expect(second.transcript).toContain('[script] execute: skipped');
 		expect(sent(second.outcome.requests)).toBe(0);
@@ -201,7 +272,10 @@ describe('a run', () => {
 
 	it('runs deployViaRouter when rocketh/config.ts spreads @rocketh/router', async () => {
 		const config = TEMPLATE_FILES['rocketh/config.ts']
-			.replace("import * as viemExtension from '@rocketh/viem';", "import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';")
+			.replace(
+				"import * as viemExtension from '@rocketh/viem';",
+				"import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';",
+			)
 			.replace('...viemExtension,', '...viemExtension,\n\t...routerExtension,');
 		expect(config).toContain('...routerExtension,');
 		const files = project({
@@ -217,7 +291,11 @@ describe('a run', () => {
 		const {outcome, transcript} = await run(files, deps());
 		expect(outcome.error).toBeUndefined();
 		expect(outcome.ok).toBe(true);
-		expect(Object.keys(outcome.deployments).sort()).toEqual(['Counter', 'Counter_Router', 'Counter_Router_Counter_Route']);
+		expect(Object.keys(outcome.deployments).sort()).toEqual([
+			'Counter',
+			'Counter_Router',
+			'Counter_Router_Counter_Route',
+		]);
 		expect(transcript).toContain('[script] x: 3n');
 	});
 });

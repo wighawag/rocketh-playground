@@ -36,19 +36,38 @@ export type SavedProject = {
 	dispose(): void;
 };
 
-export async function openSavedProject(db: string, initial: ProjectFiles): Promise<SavedProject> {
-	const selection = createIndexedDBPersistence({db, store: STORE, key: 'selected'});
-	const [vfs, saved]: [PersistentVFS, Record<string, string> | null] = await Promise.all([
-		createPersistentVFS({persistence: createIndexedDBPersistence({db, store: STORE, key: 'files'}), initial}),
-		selection.load(),
-	]);
+export async function openSavedProject(
+	db: string,
+	initial: ProjectFiles,
+): Promise<SavedProject> {
+	const selection = createIndexedDBPersistence({
+		db,
+		store: STORE,
+		key: 'selected',
+	});
+	const [vfs, saved]: [PersistentVFS, Record<string, string> | null] =
+		await Promise.all([
+			createPersistentVFS({
+				persistence: createIndexedDBPersistence({
+					db,
+					store: STORE,
+					key: 'files',
+				}),
+				initial,
+			}),
+			selection.load(),
+		]);
 	// Saves run one after the other, so the last selection is the one kept.
 	let selecting: Promise<void> = Promise.resolve();
 	let disposed = false;
 	function select(path: string) {
 		if (disposed) return;
 		selecting = selecting.then(() =>
-			selection.save({path}).catch((error) => console.error('failed to save the selected file', error)),
+			selection
+				.save({path})
+				.catch((error) =>
+					console.error('failed to save the selected file', error),
+				),
 		);
 	}
 	return {

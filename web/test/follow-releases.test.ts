@@ -1,4 +1,11 @@
-import {cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -24,8 +31,12 @@ import {BARE_MODULE_NAMES} from '../src/lib/playground/runner/bare-modules.js';
 
 const web = fileURLToPath(new URL('..', import.meta.url));
 const realPackage = JSON.parse(readFileSync(join(web, 'package.json'), 'utf8'));
-const realTemplate = JSON.parse(readFileSync(join(web, 'project-template.json'), 'utf8'));
-const pinnedRocketh: Record<string, string> = Object.fromEntries(followedPackages(realPackage).map((p) => [p.name, p.version]));
+const realTemplate = JSON.parse(
+	readFileSync(join(web, 'project-template.json'), 'utf8'),
+);
+const pinnedRocketh: Record<string, string> = Object.fromEntries(
+	followedPackages(realPackage).map((p) => [p.name, p.version]),
+);
 
 let dir: string | undefined;
 afterEach(() => {
@@ -35,29 +46,47 @@ afterEach(() => {
 
 function fixtureWeb() {
 	dir = mkdtempSync(join(tmpdir(), 'follow-releases-'));
-	for (const file of ['package.json', 'project-template.json', 'solc.json']) cpSync(join(web, file), join(dir, file));
+	for (const file of ['package.json', 'project-template.json', 'solc.json'])
+		cpSync(join(web, file), join(dir, file));
 	mkdirSync(join(dir, 'project-template'));
-	cpSync(join(web, 'project-template/hardhat.config.ts'), join(dir, 'project-template/hardhat.config.ts'));
+	cpSync(
+		join(web, 'project-template/hardhat.config.ts'),
+		join(dir, 'project-template/hardhat.config.ts'),
+	);
 	return dir;
 }
 
 /** A tiny semver bump, for stubbing "a newer release". */
 function next(version: string, part: 'patch' | 'minor' = 'patch') {
 	const [major, minor, patch] = version.split('.').map(Number);
-	return part === 'minor' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+	return part === 'minor'
+		? `${major}.${minor + 1}.0`
+		: `${major}.${minor}.${patch + 1}`;
 }
 
 /** The registry, answering each package's dist-tags from `latest` (the pinned versions by default). */
-function registry(latest: Record<string, string> = {}, extraTags: Record<string, Record<string, string>> = {}) {
+function registry(
+	latest: Record<string, string> = {},
+	extraTags: Record<string, Record<string, string>> = {},
+) {
 	const asked: string[] = [];
 	const fetchJson = async (url: string) => {
 		asked.push(url);
 		const prefix = `${REGISTRY}/-/package/`;
 		expect(url.startsWith(prefix) && url.endsWith('/dist-tags')).toBe(true);
-		const name = decodeURIComponent(url.slice(prefix.length, -'/dist-tags'.length));
-		const pinned = name === realTemplate.package ? realTemplate.version : pinnedRocketh[name];
+		const name = decodeURIComponent(
+			url.slice(prefix.length, -'/dist-tags'.length),
+		);
+		const pinned =
+			name === realTemplate.package
+				? realTemplate.version
+				: pinnedRocketh[name];
 		if (!pinned) throw new Error(`asked about ${name}, which is not followed`);
-		return {next: '99.0.0-next.1', ...extraTags[name], latest: latest[name] ?? pinned};
+		return {
+			next: '99.0.0-next.1',
+			...extraTags[name],
+			latest: latest[name] ?? pinned,
+		};
 	};
 	return {fetchJson, asked};
 }
@@ -89,8 +118,13 @@ describe('what is followed', () => {
 		expect(names).toContain('@rocketh/core');
 		// every rocketh package the runner resolves is followed, the extensions a project spreads included
 		expect(names).toContain('@rocketh/router');
-		for (const name of BARE_MODULE_NAMES.filter((n) => n === 'rocketh' || n.startsWith('@rocketh/'))) expect(names, name).toContain(name);
-		expect(names.every((n) => n === 'rocketh' || n.startsWith('@rocketh/'))).toBe(true);
+		for (const name of BARE_MODULE_NAMES.filter(
+			(n) => n === 'rocketh' || n.startsWith('@rocketh/'),
+		))
+			expect(names, name).toContain(name);
+		expect(
+			names.every((n) => n === 'rocketh' || n.startsWith('@rocketh/')),
+		).toBe(true);
 		expect(names).not.toContain('webevm');
 		expect(names).not.toContain('viem');
 	});
@@ -124,16 +158,34 @@ describe('followReleases', () => {
 		const before = read('package.json');
 		const to = next(pinnedRocketh['@rocketh/deploy']);
 		const s = stubs();
-		const result = await followReleases({webDir, ...registry({'@rocketh/deploy': to}), ...s});
+		const result = await followReleases({
+			webDir,
+			...registry({'@rocketh/deploy': to}),
+			...s,
+		});
 		expect(result.status).toBe('bumped');
-		expect(result.bumps).toEqual([{name: '@rocketh/deploy', from: pinnedRocketh['@rocketh/deploy'], to, file: 'package.json'}]);
+		expect(result.bumps).toEqual([
+			{
+				name: '@rocketh/deploy',
+				from: pinnedRocketh['@rocketh/deploy'],
+				to,
+				file: 'package.json',
+			},
+		]);
 		expect(result.branch).toBe(`follow-releases/rocketh-deploy-${to}`);
 		const after = read('package.json');
 		expect(JSON.parse(after).devDependencies['@rocketh/deploy']).toBe(to);
-		expect(after).toBe(before.replace(`"@rocketh/deploy": "${pinnedRocketh['@rocketh/deploy']}"`, `"@rocketh/deploy": "${to}"`));
+		expect(after).toBe(
+			before.replace(
+				`"@rocketh/deploy": "${pinnedRocketh['@rocketh/deploy']}"`,
+				`"@rocketh/deploy": "${to}"`,
+			),
+		);
 		expect(s.templateCalls).toEqual([]);
 		expect(result.title).toBe(`Follow releases: @rocketh/deploy ${to}`);
-		expect(result.body).toContain(`| \`@rocketh/deploy\` | ${pinnedRocketh['@rocketh/deploy']} | ${to} | \`web/package.json\` |`);
+		expect(result.body).toContain(
+			`| \`@rocketh/deploy\` | ${pinnedRocketh['@rocketh/deploy']} | ${to} | \`web/package.json\` |`,
+		);
 		expect(result.body).not.toContain('solc differs');
 	});
 
@@ -142,12 +194,18 @@ describe('followReleases', () => {
 		const before = read('package.json');
 		const to = next(realTemplate.version, 'minor');
 		const s = stubs();
-		const result = await followReleases({webDir, ...registry({'hardhat-deploy': to}), ...s});
+		const result = await followReleases({
+			webDir,
+			...registry({'hardhat-deploy': to}),
+			...s,
+		});
 		expect(result.status).toBe('bumped');
 		expect(s.templateCalls).toEqual([to]);
 		expect(result.branch).toBe(`follow-releases/hardhat-deploy-${to}`);
 		expect(read('package.json')).toBe(before);
-		expect(result.body).toContain('was refreshed with `web/scripts/update-project-template.mjs`');
+		expect(result.body).toContain(
+			'was refreshed with `web/scripts/update-project-template.mjs`',
+		);
 	});
 
 	it("says so in the body when the refreshed template's solc differs from solc.json", async () => {
@@ -158,12 +216,17 @@ describe('followReleases', () => {
 			...registry({'hardhat-deploy': to}),
 			...stubs(),
 			updateTemplate: async () => {
-				writeFileSync(join(webDir, 'project-template/hardhat.config.ts'), "export default {solidity: {profiles: {default: {version: '0.8.99'}}}};\n");
+				writeFileSync(
+					join(webDir, 'project-template/hardhat.config.ts'),
+					"export default {solidity: {profiles: {default: {version: '0.8.99'}}}};\n",
+				);
 			},
 		});
 		const pinned = JSON.parse(read('solc.json')).version;
 		expect(result.body).toContain('**solc differs**');
-		expect(result.body).toContain(`names 0.8.99, the playground ships ${pinned}`);
+		expect(result.body).toContain(
+			`names 0.8.99, the playground ships ${pinned}`,
+		);
 	});
 
 	it('takes the latest dist-tag, never a prerelease, and never goes down', async () => {
@@ -173,9 +236,16 @@ describe('followReleases', () => {
 		const result = await followReleases({
 			webDir,
 			...registry(
-				{rocketh: `${next(pinnedRocketh.rocketh, 'minor')}-beta.0`, '@rocketh/core': '0.0.1'},
+				{
+					rocketh: `${next(pinnedRocketh.rocketh, 'minor')}-beta.0`,
+					'@rocketh/core': '0.0.1',
+				},
 				// A newer release under another tag is not taken either: only `latest` counts.
-				{'@rocketh/viem': {next: next(pinnedRocketh['@rocketh/viem'], 'minor')}},
+				{
+					'@rocketh/viem': {
+						next: next(pinnedRocketh['@rocketh/viem'], 'minor'),
+					},
+				},
 			),
 			...s,
 		});
@@ -190,7 +260,11 @@ describe('followReleases', () => {
 		const hd = next(realTemplate.version);
 		const branch = `follow-releases/hardhat-deploy-${hd}-rocketh-${to}`;
 		const s = stubs({existing: [branch]});
-		const result = await followReleases({webDir, ...registry({rocketh: to, 'hardhat-deploy': hd}), ...s});
+		const result = await followReleases({
+			webDir,
+			...registry({rocketh: to, 'hardhat-deploy': hd}),
+			...s,
+		});
 		expect(result).toMatchObject({status: 'exists', branch});
 		expect(s.branchesAsked).toEqual([branch]);
 		expect(read('package.json')).toBe(before);
@@ -200,34 +274,64 @@ describe('followReleases', () => {
 	it('opens a new one when only an older bump branch exists', async () => {
 		const webDir = fixtureWeb();
 		const to = next(next(pinnedRocketh.rocketh));
-		const s = stubs({existing: [`follow-releases/rocketh-${next(pinnedRocketh.rocketh)}`]});
-		const result = await followReleases({webDir, ...registry({rocketh: to}), ...s});
-		expect(result).toMatchObject({status: 'bumped', branch: `follow-releases/rocketh-${to}`});
+		const s = stubs({
+			existing: [`follow-releases/rocketh-${next(pinnedRocketh.rocketh)}`],
+		});
+		const result = await followReleases({
+			webDir,
+			...registry({rocketh: to}),
+			...s,
+		});
+		expect(result).toMatchObject({
+			status: 'bumped',
+			branch: `follow-releases/rocketh-${to}`,
+		});
 	});
 
 	it('refuses a rocketh package that is not pinned exactly', async () => {
 		const webDir = fixtureWeb();
-		writeFileSync(join(webDir, 'package.json'), read('package.json').replace(`"rocketh": "${pinnedRocketh.rocketh}"`, `"rocketh": "^${pinnedRocketh.rocketh}"`));
-		await expect(followReleases({webDir, ...registry(), ...stubs()})).rejects.toThrow('rocketh is "^');
+		writeFileSync(
+			join(webDir, 'package.json'),
+			read('package.json').replace(
+				`"rocketh": "${pinnedRocketh.rocketh}"`,
+				`"rocketh": "^${pinnedRocketh.rocketh}"`,
+			),
+		);
+		await expect(
+			followReleases({webDir, ...registry(), ...stubs()}),
+		).rejects.toThrow('rocketh is "^');
 	});
 });
 
 describe('branchName', () => {
-	const bump = (name: string, to: string): Bump => ({name, from: '0.0.0', to, file: 'package.json'});
+	const bump = (name: string, to: string): Bump => ({
+		name,
+		from: '0.0.0',
+		to,
+		file: 'package.json',
+	});
 
 	it('follows from the versions alone, whatever their order', () => {
 		const a = [bump('rocketh', '1.0.0'), bump('@rocketh/core', '2.0.0')];
-		expect(branchName(a)).toBe('follow-releases/rocketh-core-2.0.0-rocketh-1.0.0');
+		expect(branchName(a)).toBe(
+			'follow-releases/rocketh-core-2.0.0-rocketh-1.0.0',
+		);
 		expect(branchName([...a].reverse())).toBe(branchName(a));
-		expect(branchName([bump('rocketh', '1.0.1'), bump('@rocketh/core', '2.0.0')])).not.toBe(branchName(a));
+		expect(
+			branchName([bump('rocketh', '1.0.1'), bump('@rocketh/core', '2.0.0')]),
+		).not.toBe(branchName(a));
 	});
 
 	it('is shortened to a hash of the versions when every package bumps at once', () => {
-		const many = Array.from({length: 20}, (_, i) => bump(`@rocketh/package-${i}`, `1.${i}.0`));
+		const many = Array.from({length: 20}, (_, i) =>
+			bump(`@rocketh/package-${i}`, `1.${i}.0`),
+		);
 		const name = branchName(many);
 		expect(name.length).toBeLessThanOrEqual(MAX_BRANCH_LENGTH);
 		expect(name).toMatch(/^follow-releases\/20-packages-[0-9a-f]{16}$/);
 		expect(branchName([...many].reverse())).toBe(name);
-		expect(branchName([...many.slice(1), bump('@rocketh/package-0', '9.9.9')])).not.toBe(name);
+		expect(
+			branchName([...many.slice(1), bump('@rocketh/package-0', '9.9.9')]),
+		).not.toBe(name);
 	});
 });

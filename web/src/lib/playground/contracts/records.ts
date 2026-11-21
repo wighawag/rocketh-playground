@@ -8,7 +8,10 @@
  * and follows it: a redeploy rewrites the record, and the list shows the new address and ABI.
  */
 import type {Abi, AbiFunction} from 'viem';
-import {getContractFunctions, isViewFunction} from '../../../routes/contracts/lib/utils.js';
+import {
+	getContractFunctions,
+	isViewFunction,
+} from '../../../routes/contracts/lib/utils.js';
 import {ENVIRONMENT} from '../runner/compose-config.js';
 import type {ProjectFiles} from '../project/template.js';
 
@@ -36,7 +39,9 @@ const FOLDER = `deployments/${ENVIRONMENT}/`;
 const parsed = new WeakMap<ProjectFiles, DeployedContract[]>();
 
 /** One entry per deployment record, by name. A record that does not parse is left out. */
-export function contractsFromRecords(records: ProjectFiles): DeployedContract[] {
+export function contractsFromRecords(
+	records: ProjectFiles,
+): DeployedContract[] {
 	let contracts = parsed.get(records);
 	if (!contracts) {
 		contracts = parseRecords(records);
@@ -52,13 +57,23 @@ function parseRecords(records: ProjectFiles): DeployedContract[] {
 		const file = path.slice(FOLDER.length);
 		// `.chain`, `.migrations.json` and pending transactions are rocketh's, not deployments
 		if (file.includes('/') || file.startsWith('.')) continue;
-		let record: {address?: unknown; abi?: unknown; argsData?: unknown; transaction?: {hash?: unknown}};
+		let record: {
+			address?: unknown;
+			abi?: unknown;
+			argsData?: unknown;
+			transaction?: {hash?: unknown};
+		};
 		try {
 			record = JSON.parse(content);
 		} catch {
 			continue;
 		}
-		if (typeof record.address !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(record.address) || !Array.isArray(record.abi)) continue;
+		if (
+			typeof record.address !== 'string' ||
+			!/^0x[0-9a-fA-F]{40}$/.test(record.address) ||
+			!Array.isArray(record.abi)
+		)
+			continue;
 		const abi = record.abi as Abi;
 		const functions = getContractFunctions(abi);
 		contracts.push({
@@ -66,13 +81,18 @@ function parseRecords(records: ProjectFiles): DeployedContract[] {
 			address: record.address as `0x${string}`,
 			abi,
 			path,
-			...(isHex(record.transaction?.hash) ? {transactionHash: record.transaction.hash} : {}),
+			...(isHex(record.transaction?.hash)
+				? {transactionHash: record.transaction.hash}
+				: {}),
 			...(isHex(record.argsData) ? {argsData: record.argsData} : {}),
 			viewFunctions: functions.filter((f) => isViewFunction(f.stateMutability)),
-			writeFunctions: functions.filter((f) => !isViewFunction(f.stateMutability)),
+			writeFunctions: functions.filter(
+				(f) => !isViewFunction(f.stateMutability),
+			),
 		});
 	}
 	return contracts.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const isHex = (value: unknown): value is `0x${string}` => typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value);
+const isHex = (value: unknown): value is `0x${string}` =>
+	typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value);

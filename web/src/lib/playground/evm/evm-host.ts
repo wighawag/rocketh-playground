@@ -31,7 +31,13 @@ export function evmNodeApi() {
 			const persistence = createIndexedDBPersistence({db: indexedDB});
 			if (!fresh) return api.createNode({...rest, persistence});
 			// webevm loads the saved state on creation; a fresh node is told there is none
-			const node = await api.createNode({...rest, persistence: {load: async () => null, save: (state) => persistence.save(state)}});
+			const node = await api.createNode({
+				...rest,
+				persistence: {
+					load: async () => null,
+					save: (state) => persistence.save(state),
+				},
+			});
 			await persistence.save(await node.dumpState());
 			return node;
 		},

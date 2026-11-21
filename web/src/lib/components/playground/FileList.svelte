@@ -30,24 +30,36 @@
 		<button
 			type="button"
 			class="w-full truncate rounded px-2 py-0.5 text-left font-mono text-xs hover:bg-muted"
-			class:bg-muted={selectedContract === undefined && !transactionsShown && state.selected === path}
+			class:bg-muted={selectedContract === undefined &&
+				!transactionsShown &&
+				state.selected === path}
 			data-path={path}
 			onclick={() => onselect(path)}>{path}</button
 		>
 	</li>
 {/snippet}
 
-<h2 class="px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">Project</h2>
+<h2 class="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
+	Project
+</h2>
 <ul data-testid="project-files">
 	{#each lists.project as path (path)}{@render entry(path)}{/each}
 </ul>
-<h2 class="mt-3 px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">Deployments</h2>
+<h2
+	class="mt-3 px-2 py-1 text-xs font-semibold text-muted-foreground uppercase"
+>
+	Deployments
+</h2>
 <ul data-testid="record-files">
 	{#each lists.records as path (path)}{@render entry(path)}{:else}
 		<li class="px-2 text-xs text-muted-foreground">None yet: press Deploy.</li>
 	{/each}
 </ul>
-<h2 class="mt-3 px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">Contracts</h2>
+<h2
+	class="mt-3 px-2 py-1 text-xs font-semibold text-muted-foreground uppercase"
+>
+	Contracts
+</h2>
 <ul data-testid="contract-list">
 	{#each contracts as contract (contract.name)}
 		<li>
@@ -60,14 +72,22 @@
 				onclick={() => oncontract(contract.name)}
 			>
 				<span class="truncate font-medium">{contract.name}</span>
-				<span class="shrink-0 font-mono text-muted-foreground">{truncateHex(contract.address)}</span>
+				<span class="shrink-0 font-mono text-muted-foreground"
+					>{truncateHex(contract.address)}</span
+				>
 			</button>
 		</li>
 	{:else}
-		<li class="px-2 text-xs text-muted-foreground">Deploy to read and call your contracts.</li>
+		<li class="px-2 text-xs text-muted-foreground">
+			Deploy to read and call your contracts.
+		</li>
 	{/each}
 </ul>
-<h2 class="mt-3 px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">Chain</h2>
+<h2
+	class="mt-3 px-2 py-1 text-xs font-semibold text-muted-foreground uppercase"
+>
+	Chain
+</h2>
 <ul>
 	<li>
 		<button
@@ -78,7 +98,9 @@
 			onclick={() => ontransactions()}
 		>
 			<span class="font-medium">Transactions</span>
-			{#if state.blockNumber !== undefined}<span class="shrink-0 text-muted-foreground">block {state.blockNumber}</span>{/if}
+			{#if state.blockNumber !== undefined}<span
+					class="shrink-0 text-muted-foreground">block {state.blockNumber}</span
+				>{/if}
 		</button>
 	</li>
 </ul>

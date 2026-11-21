@@ -1,8 +1,21 @@
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
-import {BUDGETS, checkBudgets, measureBuild, workerNames, type Budgets, type Bundle} from '../scripts/bundle-budgets.mjs';
+import {
+	BUDGETS,
+	checkBudgets,
+	measureBuild,
+	workerNames,
+	type Budgets,
+	type Bundle,
+} from '../scripts/bundle-budgets.mjs';
 import {BARE_MODULE_NAMES} from '../src/lib/playground/runner/bare-modules.js';
 
 /**
@@ -31,14 +44,26 @@ function fixtureBuild({pageExtra = ''}: {pageExtra?: string} = {}) {
 	dir = mkdtempSync(join(tmpdir(), 'bundle-budgets-'));
 	const client = join(dir, 'client');
 	const manifest = {
-		[`${SDK}/client/entry.js`]: {file: '_app/immutable/entry/start.js', imports: ['_shared.js'], isEntry: true},
+		[`${SDK}/client/entry.js`]: {
+			file: '_app/immutable/entry/start.js',
+			imports: ['_shared.js'],
+			isEntry: true,
+		},
 		[`${GEN}/app.js`]: {
 			file: '_app/immutable/entry/app.js',
 			imports: ['_shared.js'],
-			dynamicImports: [`${GEN}/nodes/0.js`, `${GEN}/nodes/1.js`, `${GEN}/nodes/2.js`],
+			dynamicImports: [
+				`${GEN}/nodes/0.js`,
+				`${GEN}/nodes/1.js`,
+				`${GEN}/nodes/2.js`,
+			],
 			isEntry: true,
 		},
-		[`${GEN}/nodes/0.js`]: {file: '_app/immutable/nodes/0.js', css: ['_app/immutable/assets/0.css'], isEntry: true},
+		[`${GEN}/nodes/0.js`]: {
+			file: '_app/immutable/nodes/0.js',
+			css: ['_app/immutable/assets/0.css'],
+			isEntry: true,
+		},
 		[`${GEN}/nodes/1.js`]: {file: '_app/immutable/nodes/1.js', isEntry: true},
 		[`${GEN}/nodes/2.js`]: {
 			file: '_app/immutable/nodes/2.js',
@@ -47,7 +72,11 @@ function fixtureBuild({pageExtra = ''}: {pageExtra?: string} = {}) {
 			isEntry: true,
 		},
 		'_shared.js': {file: '_app/immutable/chunks/shared.js'},
-		'src/View.svelte': {file: '_app/immutable/chunks/view.js', imports: ['_shared.js', '_lib.js'], isDynamicEntry: true},
+		'src/View.svelte': {
+			file: '_app/immutable/chunks/view.js',
+			imports: ['_shared.js', '_lib.js'],
+			isDynamicEntry: true,
+		},
 		'_lib.js': {file: '_app/immutable/chunks/lib.js'},
 	};
 	write(join(client, '.vite/manifest.json'), JSON.stringify(manifest));
@@ -76,21 +105,35 @@ function fixtureBuild({pageExtra = ''}: {pageExtra?: string} = {}) {
 		'_app/immutable/workers/assets/declarations-X.json': '{}',
 		'solc/soljson-v0.8.28.js': 'r'.repeat(90),
 	};
-	for (const [path, content] of Object.entries(files)) write(join(client, path), content);
+	for (const [path, content] of Object.entries(files))
+		write(join(client, path), content);
 	const workersSource = [
 		"new Worker(new URL('./typescript/typescript.worker.ts', import.meta.url), {type: 'module'})",
 		"new Worker(new URL('./compiler/compiler.worker.ts', import.meta.url))",
 		"new Worker(new URL('./evm/evm.worker.ts', import.meta.url), {type: 'module'})",
 		"new Worker(new URL('./runner/runner.worker.ts', import.meta.url), {type: 'module'})",
 	].join('\n');
-	return measureBuild({client, generatedApp: join(dir, 'app.js'), workersSource, soljsonPath: join(client, 'solc/soljson-v0.8.28.js')});
+	return measureBuild({
+		client,
+		generatedApp: join(dir, 'app.js'),
+		workersSource,
+		soljsonPath: join(client, 'solc/soljson-v0.8.28.js'),
+	});
 }
 
-const raw = (bundles: Bundle[], name: string) => bundles.find((b) => b.name === name)?.size.raw;
+const raw = (bundles: Bundle[], name: string) =>
+	bundles.find((b) => b.name === name)?.size.raw;
 
 /** Budgets equal to what a build measured, as `--measure` would write them. */
 function budgetsOf(bundles: Bundle[]): Budgets {
-	const budgets: Budgets = {firstLoad: m(0), onDemand: {}, workers: {}, runnerPackages: {}, declarations: m(0), soljson: m(0)};
+	const budgets: Budgets = {
+		firstLoad: m(0),
+		onDemand: {},
+		workers: {},
+		runnerPackages: {},
+		declarations: m(0),
+		soljson: m(0),
+	};
 	for (const b of bundles) {
 		const entry = {...b.size, measured: '2026-11-20'};
 		if (b.key === '') (budgets as Record<string, unknown>)[b.group] = entry;
@@ -122,11 +165,19 @@ describe('measuring a build', () => {
 		// The view's own chunk and what it adds; the shared chunk is already loaded.
 		expect(raw(bundles, 'on demand: src/View.svelte')).toBe(2000 + 3000);
 		const workers = '_app/immutable/workers';
-		expect(raw(bundles, 'evm worker')).toBe(size(`${workers}/evm.worker-CCC.js`) + 40);
-		expect(raw(bundles, 'runner worker')).toBe(size(`${workers}/runner.worker-DDD.js`) + 50);
+		expect(raw(bundles, 'evm worker')).toBe(
+			size(`${workers}/evm.worker-CCC.js`) + 40,
+		);
+		expect(raw(bundles, 'runner worker')).toBe(
+			size(`${workers}/runner.worker-DDD.js`) + 50,
+		);
 		// A package's chunk and its own imports, not what the runner already holds.
-		expect(raw(bundles, 'runner package rocketh')).toBe(size(`${workers}/chunks/rocketh.js`) + 80);
-		expect(raw(bundles, 'runner package @rocketh/deploy')).toBe(size(`${workers}/chunks/deploy.js`) + 80);
+		expect(raw(bundles, 'runner package rocketh')).toBe(
+			size(`${workers}/chunks/rocketh.js`) + 80,
+		);
+		expect(raw(bundles, 'runner package @rocketh/deploy')).toBe(
+			size(`${workers}/chunks/deploy.js`) + 80,
+		);
 		expect(raw(bundles, 'TypeScript declarations')).toBe(2);
 		expect(raw(bundles, 'soljson')).toBe(90);
 		for (const b of bundles) expect(b.size.gzip).toBeGreaterThan(0);
@@ -165,18 +216,29 @@ describe('checking the budgets', () => {
 		budgets.runnerPackages['viem/gone'] = m(1);
 		const failures = checkBudgets(bundles, budgets);
 		expect(failures).toHaveLength(2);
-		expect(failures[0]).toMatch(/^on demand: src\/View\.svelte: 5,000 B raw, \d+ B gzip, has no budget/);
-		expect(failures[1]).toBe('runnerPackages viem/gone: has a budget but is not in the build (remove it)');
+		expect(failures[0]).toMatch(
+			/^on demand: src\/View\.svelte: 5,000 B raw, \d+ B gzip, has no budget/,
+		);
+		expect(failures[1]).toBe(
+			'runnerPackages viem/gone: has a budget but is not in the build (remove it)',
+		);
 	});
 });
 
 describe('the budgets', () => {
 	it('has one for each worker workers.ts creates', () => {
-		const source = readFileSync(new URL('../src/lib/playground/workers.ts', import.meta.url), 'utf8');
-		expect(Object.keys(BUDGETS.workers).sort()).toEqual(workerNames(source).sort());
+		const source = readFileSync(
+			new URL('../src/lib/playground/workers.ts', import.meta.url),
+			'utf8',
+		);
+		expect(Object.keys(BUDGETS.workers).sort()).toEqual(
+			workerNames(source).sort(),
+		);
 	});
 
 	it('has one for each package the runner loads lazily', () => {
-		expect(Object.keys(BUDGETS.runnerPackages).sort()).toEqual([...BARE_MODULE_NAMES].sort());
+		expect(Object.keys(BUDGETS.runnerPackages).sort()).toEqual(
+			[...BARE_MODULE_NAMES].sort(),
+		);
 	});
 });

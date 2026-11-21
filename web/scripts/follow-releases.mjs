@@ -62,9 +62,12 @@ export function followedPackages(packageJson) {
 
 /** The registry's `latest` dist-tag for `name`, through `fetchJson(url)`. */
 export async function latestVersion(name, fetchJson) {
-	const tags = await fetchJson(`${REGISTRY}/-/package/${name.replace('/', '%2f')}/dist-tags`);
+	const tags = await fetchJson(
+		`${REGISTRY}/-/package/${name.replace('/', '%2f')}/dist-tags`,
+	);
 	const latest = tags?.latest;
-	if (typeof latest !== 'string') throw new Error(`${name}: the registry gives no latest dist-tag`);
+	if (typeof latest !== 'string')
+		throw new Error(`${name}: the registry gives no latest dist-tag`);
 	return latest;
 }
 
@@ -74,15 +77,26 @@ export async function latestVersion(name, fetchJson) {
  * lives, `package.json` or `project-template.json`.
  */
 export async function planBumps({packageJson, templateRecord, fetchJson}) {
-	const followed = followedPackages(packageJson).map((p) => ({...p, file: 'package.json'}));
+	const followed = followedPackages(packageJson).map((p) => ({
+		...p,
+		file: 'package.json',
+	}));
 	for (const p of followed) {
-		if (!isRelease(p.version)) throw new Error(`${p.name} is "${p.version}" in package.json; it must be pinned exactly`);
+		if (!isRelease(p.version))
+			throw new Error(
+				`${p.name} is "${p.version}" in package.json; it must be pinned exactly`,
+			);
 	}
-	followed.push({name: templateRecord.package, version: templateRecord.version, file: 'project-template.json'});
+	followed.push({
+		name: templateRecord.package,
+		version: templateRecord.version,
+		file: 'project-template.json',
+	});
 	const bumps = [];
 	for (const {name, version, file} of followed) {
 		const latest = await latestVersion(name, fetchJson);
-		if (isRelease(latest) && compareReleases(latest, version) > 0) bumps.push({name, from: version, to: latest, file});
+		if (isRelease(latest) && compareReleases(latest, version) > 0)
+			bumps.push({name, from: version, to: latest, file});
 	}
 	return bumps.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
@@ -99,7 +113,10 @@ export function branchName(bumps) {
 		.map(({name, to}) => `${name.replace(/^@/, '').replace('/', '-')}-${to}`);
 	const name = BRANCH_PREFIX + parts.join('-');
 	if (name.length <= MAX_BRANCH_LENGTH) return name;
-	const hash = createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 16);
+	const hash = createHash('sha256')
+		.update(parts.join('\n'))
+		.digest('hex')
+		.slice(0, 16);
 	return `${BRANCH_PREFIX}${bumps.length}-packages-${hash}`;
 }
 
@@ -109,7 +126,8 @@ export function pinVersions(text, bumps) {
 	for (const {name, from, to} of bumps) {
 		const pin = `"${name}": "${from}"`;
 		const count = out.split(pin).length - 1;
-		if (count !== 1) throw new Error(`package.json: expected one ${pin}, found ${count}`);
+		if (count !== 1)
+			throw new Error(`package.json: expected one ${pin}, found ${count}`);
 		out = out.replace(pin, `"${name}": "${to}"`);
 	}
 	return out;
@@ -117,7 +135,13 @@ export function pinVersions(text, bumps) {
 
 /** The solc versions a hardhat config's text names (`version: '0.8.28'`), each once. */
 export function configSolcVersions(configText) {
-	return [...new Set([...configText.matchAll(/version:\s*['"](\d+\.\d+\.\d+)['"]/g)].map((m) => m[1]))];
+	return [
+		...new Set(
+			[...configText.matchAll(/version:\s*['"](\d+\.\d+\.\d+)['"]/g)].map(
+				(m) => m[1],
+			),
+		),
+	];
 }
 
 /** The pull request's title for `bumps`. */
@@ -132,11 +156,17 @@ export function pullRequestBody({bumps, pinnedSolc, templateSolc}) {
 		'',
 		'| Package | From | To | Where |',
 		'| --- | --- | --- | --- |',
-		...bumps.map(({name, from, to, file}) => `| \`${name}\` | ${from} | ${to} | \`web/${file}\` |`),
+		...bumps.map(
+			({name, from, to, file}) =>
+				`| \`${name}\` | ${from} | ${to} | \`web/${file}\` |`,
+		),
 		'',
 	];
 	if (bumps.some((b) => b.file === 'project-template.json')) {
-		lines.push('The starting project, `web/project-template/`, was refreshed with `web/scripts/update-project-template.mjs`.', '');
+		lines.push(
+			'The starting project, `web/project-template/`, was refreshed with `web/scripts/update-project-template.mjs`.',
+			'',
+		);
 	}
 	const other = templateSolc.filter((v) => v !== pinnedSolc);
 	if (other.length > 0) {
@@ -156,23 +186,45 @@ export function pullRequestBody({bumps, pinnedSolc, templateSolc}) {
  * `branchExists(name)` asks `origin`, `updateTemplate(version)` refreshes the starting project.
  * Resolves to `{status, bumps, branch?, title?, body?}`; files change only for status `bumped`.
  */
-export async function followReleases({webDir, fetchJson, branchExists, updateTemplate}) {
+export async function followReleases({
+	webDir,
+	fetchJson,
+	branchExists,
+	updateTemplate,
+}) {
 	const packagePath = join(webDir, 'package.json');
 	const packageText = readFileSync(packagePath, 'utf8');
-	const templateRecord = JSON.parse(readFileSync(join(webDir, 'project-template.json'), 'utf8'));
-	const bumps = await planBumps({packageJson: JSON.parse(packageText), templateRecord, fetchJson});
+	const templateRecord = JSON.parse(
+		readFileSync(join(webDir, 'project-template.json'), 'utf8'),
+	);
+	const bumps = await planBumps({
+		packageJson: JSON.parse(packageText),
+		templateRecord,
+		fetchJson,
+	});
 	if (bumps.length === 0) return {status: 'nothing', bumps};
 	const branch = branchName(bumps);
 	if (await branchExists(branch)) return {status: 'exists', bumps, branch};
 
 	const pins = bumps.filter((b) => b.file === 'package.json');
-	if (pins.length > 0) writeFileSync(packagePath, pinVersions(packageText, pins));
+	if (pins.length > 0)
+		writeFileSync(packagePath, pinVersions(packageText, pins));
 	const template = bumps.find((b) => b.file === 'project-template.json');
 	if (template) await updateTemplate(template.to);
 
-	const pinnedSolc = JSON.parse(readFileSync(join(webDir, 'solc.json'), 'utf8')).version;
-	const templateSolc = configSolcVersions(readFileSync(join(webDir, 'project-template/hardhat.config.ts'), 'utf8'));
-	return {status: 'bumped', bumps, branch, title: pullRequestTitle(bumps), body: pullRequestBody({bumps, pinnedSolc, templateSolc})};
+	const pinnedSolc = JSON.parse(
+		readFileSync(join(webDir, 'solc.json'), 'utf8'),
+	).version;
+	const templateSolc = configSolcVersions(
+		readFileSync(join(webDir, 'project-template/hardhat.config.ts'), 'utf8'),
+	);
+	return {
+		status: 'bumped',
+		bumps,
+		branch,
+		title: pullRequestTitle(bumps),
+		body: pullRequestBody({bumps, pinnedSolc, templateSolc}),
+	};
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -187,22 +239,42 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 			return response.json();
 		},
 		branchExists: async (branch) =>
-			execFileSync('git', ['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], {cwd: webDir, encoding: 'utf8'}).trim() !== '',
+			execFileSync(
+				'git',
+				['ls-remote', '--heads', 'origin', `refs/heads/${branch}`],
+				{cwd: webDir, encoding: 'utf8'},
+			).trim() !== '',
 		updateTemplate: async (version) => {
-			execFileSync(process.execPath, [join(webDir, 'scripts/update-project-template.mjs'), version], {cwd: webDir, stdio: 'inherit'});
+			execFileSync(
+				process.execPath,
+				[join(webDir, 'scripts/update-project-template.mjs'), version],
+				{cwd: webDir, stdio: 'inherit'},
+			);
 		},
 	});
-	for (const {name, from, to} of result.bumps) console.log(`${name}: ${from} -> ${to}`);
+	for (const {name, from, to} of result.bumps)
+		console.log(`${name}: ${from} -> ${to}`);
 	console.log(
-		{nothing: 'nothing newer on npm', exists: `${result.branch} already exists: nothing to open`, bumped: `bumped, for ${result.branch}`}[result.status],
+		{
+			nothing: 'nothing newer on npm',
+			exists: `${result.branch} already exists: nothing to open`,
+			bumped: `bumped, for ${result.branch}`,
+		}[result.status],
 	);
 	if (out) {
 		mkdirSync(out, {recursive: true});
-		writeFileSync(join(out, 'result.json'), JSON.stringify(result, null, '\t') + '\n');
-		if (result.title) writeFileSync(join(out, 'title.txt'), result.title + '\n');
+		writeFileSync(
+			join(out, 'result.json'),
+			JSON.stringify(result, null, '\t') + '\n',
+		);
+		if (result.title)
+			writeFileSync(join(out, 'title.txt'), result.title + '\n');
 		if (result.body) writeFileSync(join(out, 'body.md'), result.body);
 	}
 	if (process.env.GITHUB_OUTPUT) {
-		appendFileSync(process.env.GITHUB_OUTPUT, `status=${result.status}\nbranch=${result.branch ?? ''}\n`);
+		appendFileSync(
+			process.env.GITHUB_OUTPUT,
+			`status=${result.status}\nbranch=${result.branch ?? ''}\n`,
+		);
 	}
 }

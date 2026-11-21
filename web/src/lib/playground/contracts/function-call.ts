@@ -10,7 +10,14 @@
 import {writable, type Readable} from 'svelte/store';
 import type {AbiFunction} from 'viem';
 import type {SigningAccount} from './accounts.js';
-import {callErrorMessage, readFunction, writeFunction, type ContractTarget, type RequestProvider, type WriteOutcome} from './chain-calls.js';
+import {
+	callErrorMessage,
+	readFunction,
+	writeFunction,
+	type ContractTarget,
+	type RequestProvider,
+	type WriteOutcome,
+} from './chain-calls.js';
 
 /** What the view needs of the session. */
 export type ContractsChain = {
@@ -30,11 +37,20 @@ export type FunctionCallState = {
 
 export type FunctionCallStore = Readable<FunctionCallState> & {
 	read(inputValues: Record<string, string>): Promise<void>;
-	write(inputValues: Record<string, string>, inputErrors: Record<string, string>, from: SigningAccount): Promise<void>;
+	write(
+		inputValues: Record<string, string>,
+		inputErrors: Record<string, string>,
+		from: SigningAccount,
+	): Promise<void>;
 	clear(): void;
 };
 
-const initial: FunctionCallState = {loading: false, result: null, transaction: null, error: null};
+const initial: FunctionCallState = {
+	loading: false,
+	result: null,
+	transaction: null,
+	error: null,
+};
 
 export function createFunctionCall(deps: {
 	abiItem: () => AbiFunction;
@@ -51,32 +67,58 @@ export function createFunctionCall(deps: {
 		}
 		store.set({...initial, loading: true});
 		try {
-			const result = await readFunction({provider, abiItem: deps.abiItem(), contract: deps.contract(), inputValues});
+			const result = await readFunction({
+				provider,
+				abiItem: deps.abiItem(),
+				contract: deps.contract(),
+				inputValues,
+			});
 			store.set({...initial, result});
 		} catch (e) {
 			store.set({...initial, error: callErrorMessage(e)});
 		}
 	}
 
-	async function write(inputValues: Record<string, string>, inputErrors: Record<string, string>, from: SigningAccount) {
+	async function write(
+		inputValues: Record<string, string>,
+		inputErrors: Record<string, string>,
+		from: SigningAccount,
+	) {
 		if (Object.values(inputErrors).some((e) => e !== undefined)) {
-			store.update((s) => ({...s, error: 'Please fix input errors before executing'}));
+			store.update((s) => ({
+				...s,
+				error: 'Please fix input errors before executing',
+			}));
 			return;
 		}
 		store.set({...initial, loading: true});
 		try {
 			const outcome = await deps.chain().transact((provider) =>
-				writeFunction({provider, abiItem: deps.abiItem(), contract: deps.contract(), inputValues, keyIndex: from.keyIndex}),
+				writeFunction({
+					provider,
+					abiItem: deps.abiItem(),
+					contract: deps.contract(),
+					inputValues,
+					keyIndex: from.keyIndex,
+				}),
 			);
 			store.set({
 				...initial,
 				transaction: {...outcome, fromLabel: from.label},
-				error: outcome.status === 'reverted' ? 'The transaction was mined and reverted' : null,
+				error:
+					outcome.status === 'reverted'
+						? 'The transaction was mined and reverted'
+						: null,
 			});
 		} catch (e) {
 			store.set({...initial, error: callErrorMessage(e)});
 		}
 	}
 
-	return {subscribe: store.subscribe, read, write, clear: () => store.set(initial)};
+	return {
+		subscribe: store.subscribe,
+		read,
+		write,
+		clear: () => store.set(initial),
+	};
 }

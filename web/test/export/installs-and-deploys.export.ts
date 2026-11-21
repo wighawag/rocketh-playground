@@ -93,7 +93,10 @@ function routedCounter(): ProjectFiles {
 function bareGreeter(): ProjectFiles {
 	const vector = JSON.parse(
 		readFileSync(
-			new URL('../lib/playground/overlay-link-bare-vector.json', import.meta.url),
+			new URL(
+				'../lib/playground/overlay-link-bare-vector.json',
+				import.meta.url,
+			),
 			'utf8',
 		),
 	) as {files: ProjectFiles};
@@ -163,7 +166,10 @@ describe('the exported project', () => {
 	});
 
 	it("installs, compiles and deploys a bare link's project: Greeter, without the Counter sample or its tests", async () => {
-		const {project, outputs} = await exportAndDeploy('bare-greeter', bareGreeter());
+		const {project, outputs} = await exportAndDeploy(
+			'bare-greeter',
+			bareGreeter(),
+		);
 		for (const path of [...COUNTER_SAMPLE_PATHS, ...COUNTER_TESTS])
 			expect(exists(join(project, path)), path).toBe(false);
 		expect(exists(join(project, 'contracts/Greeter.sol'))).toBe(true);

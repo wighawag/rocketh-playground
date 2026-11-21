@@ -53,7 +53,9 @@ export function collectDeclarations({specifiers, compilerOptions: options}) {
 	/** @type {typeof import('typescript')} */
 	const ts = require('typescript');
 	const entry = join(web, '__playground_declarations_entry__.ts');
-	const entryText = specifiers.map((s, i) => `import type * as m${i} from '${s}';`).join('\n');
+	const entryText = specifiers
+		.map((s, i) => `import type * as m${i} from '${s}';`)
+		.join('\n');
 
 	const host = ts.createCompilerHost(options);
 	const read = new Set();
@@ -77,7 +79,8 @@ export function collectDeclarations({specifiers, compilerOptions: options}) {
 		.getPreEmitDiagnostics(program)
 		.filter((d) => d.file?.fileName === entry)
 		.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
-	if (problems.length > 0) throw new Error(`the declarations do not resolve:\n${problems.join('\n')}`);
+	if (problems.length > 0)
+		throw new Error(`the declarations do not resolve:\n${problems.join('\n')}`);
 
 	const libDir = realpathSync(dirname(ts.getDefaultLibFilePath(options)));
 	/** @type {Record<string, string>} */
@@ -122,7 +125,8 @@ export function collectDeclarations({specifiers, compilerOptions: options}) {
 		for (const others of byName.values()) {
 			for (const other of others.keys()) {
 				const target = resolveFrom(nodeModulesOf.get(other), name);
-				if (target && votes.has(target)) votes.set(target, votes.get(target) + 1);
+				if (target && votes.has(target))
+					votes.set(target, votes.get(target) + 1);
 			}
 		}
 		hoisted.set(name, [...votes.entries()].sort((a, b) => b[1] - a[1])[0][0]);
@@ -144,22 +148,35 @@ export function collectDeclarations({specifiers, compilerOptions: options}) {
 	for (const [name, dirs] of byName) {
 		const top = hoisted.get(name);
 		const bytes = put(`/node_modules/${name}`, top, dirs.get(top));
-		packages[name] = {version: JSON.parse(readFileSync(join(top, 'package.json'), 'utf8')).version, bytes};
+		packages[name] = {
+			version: JSON.parse(readFileSync(join(top, 'package.json'), 'utf8'))
+				.version,
+			bytes,
+		};
 		for (const [dir, rests] of dirs) {
 			if (dir === top) continue;
 			// Nest this version under every dependent that resolves to it.
 			let nested = 0;
 			for (const [dependent, dependentDirs] of byName) {
 				for (const dependentDir of dependentDirs.keys()) {
-					if (dependent === name || resolveFrom(nodeModulesOf.get(dependentDir), name) !== dir) continue;
+					if (
+						dependent === name ||
+						resolveFrom(nodeModulesOf.get(dependentDir), name) !== dir
+					)
+						continue;
 					if (dependentDir !== hoisted.get(dependent)) {
-						throw new Error(`${name}: needed by a second copy of ${dependent}, which this layout does not nest`);
+						throw new Error(
+							`${name}: needed by a second copy of ${dependent}, which this layout does not nest`,
+						);
 					}
 					put(`/node_modules/${dependent}/node_modules/${name}`, dir, rests);
 					nested++;
 				}
 			}
-			if (nested === 0) throw new Error(`${name}: ${dir} was read but no package resolves to it`);
+			if (nested === 0)
+				throw new Error(
+					`${name}: ${dir} was read but no package resolves to it`,
+				);
 		}
 	}
 	return {files, libs, packages};

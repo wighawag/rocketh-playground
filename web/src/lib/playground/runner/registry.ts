@@ -11,7 +11,11 @@
  * and the runner knows which packages to load.
  */
 import type {ProjectFiles} from '../project/template.js';
-import {describeSupportedImports, isBareModuleName, type BareModuleName} from './bare-modules.js';
+import {
+	describeSupportedImports,
+	isBareModuleName,
+	type BareModuleName,
+} from './bare-modules.js';
 
 export class UnsupportedImportError extends Error {
 	constructor(
@@ -55,11 +59,21 @@ function normalize(path: string): string {
 	return out.join('/');
 }
 
-export function resolveRelative(files: ProjectFiles, specifier: string, from: string): string | undefined {
+export function resolveRelative(
+	files: ProjectFiles,
+	specifier: string,
+	from: string,
+): string | undefined {
 	const base = normalize(`${dirname(from)}/${specifier}`);
 	const candidates = [base];
 	if (base.endsWith('.js')) candidates.push(base.slice(0, -3) + '.ts');
-	if (!/\.[cm]?[jt]s$/.test(base)) candidates.push(`${base}.ts`, `${base}.js`, `${base}/index.ts`, `${base}/index.js`);
+	if (!/\.[cm]?[jt]s$/.test(base))
+		candidates.push(
+			`${base}.ts`,
+			`${base}.js`,
+			`${base}/index.ts`,
+			`${base}/index.js`,
+		);
 	return candidates.find((c) => c in files);
 }
 
@@ -102,13 +116,19 @@ export function checkImports(
  */
 function asCommonJS(namespace: object): object {
 	const copy: Record<string, unknown> = {};
-	for (const key of Object.keys(namespace)) copy[key] = (namespace as Record<string, unknown>)[key];
+	for (const key of Object.keys(namespace))
+		copy[key] = (namespace as Record<string, unknown>)[key];
 	Object.defineProperty(copy, '__esModule', {value: true});
 	return copy;
 }
 
-export function createRegistry(modules: ProjectFiles, bare: Partial<Record<BareModuleName, object>>) {
-	const packages = new Map(Object.entries(bare).map(([name, ns]) => [name, asCommonJS(ns as object)]));
+export function createRegistry(
+	modules: ProjectFiles,
+	bare: Partial<Record<BareModuleName, object>>,
+) {
+	const packages = new Map(
+		Object.entries(bare).map(([name, ns]) => [name, asCommonJS(ns as object)]),
+	);
 	const cache = new Map<string, {exports: unknown}>();
 
 	function requireFrom(from: string) {
@@ -133,7 +153,12 @@ export function createRegistry(modules: ProjectFiles, bare: Partial<Record<BareM
 		cache.set(path, module);
 		// `sourceURL` names the file in a stack trace, so an error thrown by a script points at
 		// `deploy/01_deploy_counter.ts` rather than at an anonymous function.
-		const evaluate = new Function('exports', 'require', 'module', `${modules[path]}\n//# sourceURL=project:///${path}`);
+		const evaluate = new Function(
+			'exports',
+			'require',
+			'module',
+			`${modules[path]}\n//# sourceURL=project:///${path}`,
+		);
 		try {
 			evaluate(module.exports, requireFrom(path), module);
 		} catch (error) {

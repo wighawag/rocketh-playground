@@ -10,7 +10,10 @@ export type Diagnostic = {
 };
 
 /** 1-based line and column of a 0-based character offset. */
-export function lineAndColumn(text: string, offset: number): {line: number; column: number} {
+export function lineAndColumn(
+	text: string,
+	offset: number,
+): {line: number; column: number} {
 	let line = 1;
 	let lineStart = 0;
 	for (let i = 0; i < offset && i < text.length; i++) {

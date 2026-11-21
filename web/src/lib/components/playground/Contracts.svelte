@@ -21,10 +21,14 @@
 
 	let {session, name}: {session: PlaygroundSession; name: string} = $props();
 
-	const contract = $derived(contractsFromRecords($session.records).find((c) => c.name === name));
+	const contract = $derived(
+		contractsFromRecords($session.records).find((c) => c.name === name),
+	);
 	const accounts = $derived(signingAccounts($session.namedAccounts));
 	let fromIndex = $state<number | undefined>();
-	const from = $derived(accounts.find((a) => a.keyIndex === fromIndex) ?? accounts[0]);
+	const from = $derived(
+		accounts.find((a) => a.keyIndex === fromIndex) ?? accounts[0],
+	);
 	const canWrite = $derived($session.phase === 'ready');
 </script>
 
@@ -34,14 +38,20 @@
 			<Empty.Header>
 				<Empty.Media variant="icon"><FileCodeIcon /></Empty.Media>
 				<Empty.Title>No contract named {name}</Empty.Title>
-				<Empty.Description>Its deployment record is gone. Deploy to write it again.</Empty.Description>
+				<Empty.Description
+					>Its deployment record is gone. Deploy to write it again.</Empty.Description
+				>
 			</Empty.Header>
 		</Empty.Root>
 	{:else}
 		<div class="space-y-4">
-			<div class="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-lg bg-muted/50 p-3">
+			<div
+				class="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-lg bg-muted/50 p-3"
+			>
 				<div class="min-w-0">
-					<h2 class="text-lg font-semibold" data-testid="contract-name">{contract.name}</h2>
+					<h2 class="text-lg font-semibold" data-testid="contract-name">
+						{contract.name}
+					</h2>
 					<Address
 						value={contract.address}
 						truncate={false}
@@ -51,22 +61,28 @@
 						data-testid="contract-address"
 					/>
 				</div>
-				<label class="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+				<label
+					class="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground"
+				>
 					Writes are sent from
 					<select
 						data-testid="send-from"
 						class="h-9 max-w-full rounded-md border border-input bg-background px-2 font-mono text-sm text-foreground"
 						value={from?.keyIndex}
-						onchange={(event) => (fromIndex = Number(event.currentTarget.value))}
+						onchange={(event) =>
+							(fromIndex = Number(event.currentTarget.value))}
 					>
 						{#each accounts as account (account.keyIndex)}
-							<option value={account.keyIndex} title={account.address}>{account.label} ({truncateHex(account.address)})</option>
+							<option value={account.keyIndex} title={account.address}
+								>{account.label} ({truncateHex(account.address)})</option
+							>
 						{/each}
 					</select>
 				</label>
 			</div>
 			<p class="text-xs text-muted-foreground">
-				Reads are calls on the chain in this tab. Writes are signed with a throwaway test key and mined there at once{#if !$session.namedAccounts};
+				Reads are calls on the chain in this tab. Writes are signed with a
+				throwaway test key and mined there at once{#if !$session.namedAccounts};
 					the account names come from your config once you have deployed{/if}.
 			</p>
 
@@ -74,14 +90,20 @@
 				<Empty.Root>
 					<Empty.Header>
 						<Empty.Title>No Functions Found</Empty.Title>
-						<Empty.Description>This contract has no callable functions.</Empty.Description>
+						<Empty.Description
+							>This contract has no callable functions.</Empty.Description
+						>
 					</Empty.Header>
 				</Empty.Root>
 			{:else}
 				<Tabs.Root value="read">
 					<Tabs.List class="mb-3">
-						<Tabs.Trigger value="read" data-testid="tab-read">Read ({contract.viewFunctions.length})</Tabs.Trigger>
-						<Tabs.Trigger value="write" data-testid="tab-write">Write ({contract.writeFunctions.length})</Tabs.Trigger>
+						<Tabs.Trigger value="read" data-testid="tab-read"
+							>Read ({contract.viewFunctions.length})</Tabs.Trigger
+						>
+						<Tabs.Trigger value="write" data-testid="tab-write"
+							>Write ({contract.writeFunctions.length})</Tabs.Trigger
+						>
 					</Tabs.List>
 					<Tabs.Content value="read">
 						{#if contract.viewFunctions.length > 0}
@@ -89,22 +111,40 @@
 								<!-- Keyed by address and full signature: a redeploy starts fresh forms, and
 								     overloads share a name. -->
 								{#each contract.viewFunctions as func (`${contract.address}:${getFunctionSignature(func)}`)}
-									<ContractFunction functionName={func.name} abiItem={func} {contract} chain={session} {from} {canWrite} />
+									<ContractFunction
+										functionName={func.name}
+										abiItem={func}
+										{contract}
+										chain={session}
+										{from}
+										{canWrite}
+									/>
 								{/each}
 							</div>
 						{:else}
-							<p class="text-sm text-muted-foreground">This contract has no view functions.</p>
+							<p class="text-sm text-muted-foreground">
+								This contract has no view functions.
+							</p>
 						{/if}
 					</Tabs.Content>
 					<Tabs.Content value="write">
 						{#if contract.writeFunctions.length > 0}
 							<div class="grid gap-4 lg:grid-cols-2">
 								{#each contract.writeFunctions as func (`${contract.address}:${getFunctionSignature(func)}`)}
-									<ContractFunction functionName={func.name} abiItem={func} {contract} chain={session} {from} {canWrite} />
+									<ContractFunction
+										functionName={func.name}
+										abiItem={func}
+										{contract}
+										chain={session}
+										{from}
+										{canWrite}
+									/>
 								{/each}
 							</div>
 						{:else}
-							<p class="text-sm text-muted-foreground">This contract has no write functions.</p>
+							<p class="text-sm text-muted-foreground">
+								This contract has no write functions.
+							</p>
 						{/if}
 					</Tabs.Content>
 				</Tabs.Root>

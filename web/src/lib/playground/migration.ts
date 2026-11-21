@@ -23,28 +23,38 @@
 import type {RunError} from './runner/run.js';
 
 /** rocketh.dev's page for hardhat-deploy v1 users: what changed, and how to port a project. */
-export const MIGRATION_GUIDE_URL = 'https://rocketh.dev/hardhat-deploy/migration/';
+export const MIGRATION_GUIDE_URL =
+	'https://rocketh.dev/hardhat-deploy/migration/';
 
 /** What the transcript adds after rocketh's own error, when the run looks like a v1 script. */
 export const V1_SCRIPT_HINT =
 	"This looks like a hardhat-deploy v1 deploy script: rocketh's deploy scripts are made with deployScript(...) and receive their functions (deploy, namedAccounts, ...) from the environment rather than from hre. What changed, and how to port it:";
 
-export const MIGRATION_GUIDE_LABEL = 'Coming from hardhat-deploy v1 (rocketh.dev)';
+export const MIGRATION_GUIDE_LABEL =
+	'Coming from hardhat-deploy v1 (rocketh.dev)';
 
-const V1_ONLY_MODULE = /^(hardhat|hardhat-deploy)(\/.*)?$|^hardhat-deploy-ethers$/;
+const V1_ONLY_MODULE =
+	/^(hardhat|hardhat-deploy)(\/.*)?$|^hardhat-deploy-ethers$/;
 
 /** The specifier an `UnsupportedImportError` names (`registry.ts`: `<file> imports "<specifier>", ...`). */
-const REFUSED_IMPORT = / imports "([^"]+)", which the playground cannot provide/;
+const REFUSED_IMPORT =
+	/ imports "([^"]+)", which the playground cannot provide/;
 
-const V1_HRE_API = /\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
+const V1_HRE_API =
+	/\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
 
 /** The runner's error for a script whose default export is not a function (`runner/run.ts`). */
-const NO_DEFAULT_EXPORT = /^(.+) has no default export made with deployScript\(\.\.\.\)$/;
+const NO_DEFAULT_EXPORT =
+	/^(.+) has no default export made with deployScript\(\.\.\.\)$/;
 
-const V1_SHAPED_SCRIPT = /\bhre\b|\bHardhatRuntimeEnvironment\b|\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
+const V1_SHAPED_SCRIPT =
+	/\bhre\b|\bHardhatRuntimeEnvironment\b|\b(getNamedAccounts|getUnnamedAccounts|getChainId|deployments)\b/;
 
 /** `files` are the project's sources by path, as the session ran them; only the third shape reads them. */
-export function looksLikeV1Script(error: Pick<RunError, 'name' | 'message'>, files: Readonly<Record<string, string>> = {}): boolean {
+export function looksLikeV1Script(
+	error: Pick<RunError, 'name' | 'message'>,
+	files: Readonly<Record<string, string>> = {},
+): boolean {
 	if (error.name === 'UnsupportedImportError') {
 		const specifier = REFUSED_IMPORT.exec(error.message)?.[1];
 		return specifier !== undefined && V1_ONLY_MODULE.test(specifier);

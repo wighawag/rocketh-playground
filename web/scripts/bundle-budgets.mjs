@@ -42,9 +42,21 @@ export const BUDGETS = {
 		// Share's encoder (with fflate), loaded on the first press.
 		'src/lib/playground/project/share-link.ts': m(12961, 6429, '2026-11-20'),
 		// Download's zip (with fflate), loaded on the first press.
-		'src/lib/playground/project/export-project.ts': m(15714, 7710, '2026-11-20'),
-		'src/lib/components/playground/Contracts.svelte': m(344034, 103325, '2026-11-20'),
-		'src/lib/components/playground/Transactions.svelte': m(332926, 101345, '2026-11-20'),
+		'src/lib/playground/project/export-project.ts': m(
+			15714,
+			7710,
+			'2026-11-20',
+		),
+		'src/lib/components/playground/Contracts.svelte': m(
+			344034,
+			103325,
+			'2026-11-20',
+		),
+		'src/lib/components/playground/Transactions.svelte': m(
+			332926,
+			101345,
+			'2026-11-20',
+		),
 	},
 	workers: {
 		typescript: m(3484391, 968786, '2026-11-20'),
@@ -134,12 +146,20 @@ export function pageBundles(manifest, rootNode) {
 		key.endsWith('client-optimized/nodes/0.js') ||
 		key.endsWith(`client-optimized/nodes/${rootNode}.js`);
 	const roots = Object.keys(manifest).filter(isRoot);
-	if (roots.length !== 4) throw new Error(`expected 4 first-load roots in the manifest, found ${roots.join(', ') || 'none'}`);
+	if (roots.length !== 4)
+		throw new Error(
+			`expected 4 first-load roots in the manifest, found ${roots.join(', ') || 'none'}`,
+		);
 	const first = manifestClosure(manifest, roots);
 	const onDemand = new Map();
 	for (const key of first.keys) {
 		for (const target of manifest[key].dynamicImports ?? []) {
-			if (first.keys.has(target) || onDemand.has(target) || target.startsWith('.svelte-kit/generated/')) continue;
+			if (
+				first.keys.has(target) ||
+				onDemand.has(target) ||
+				target.startsWith('.svelte-kit/generated/')
+			)
+				continue;
 			const files = manifestClosure(manifest, [target]).files;
 			for (const f of first.files) files.delete(f);
 			onDemand.set(target, files);
@@ -152,9 +172,12 @@ export function pageBundles(manifest, rootNode) {
 // The workers, from the emitted files.
 
 // Bounded patterns over (possibly one-line, multi-MB) minified files: no unbounded repetition.
-const STATIC_IMPORT = /\b(?:from|import)\s*(["'`])(\.{1,2}\/[^"'`\s]{1,300}?\.js)\1/g;
-const DYNAMIC_IMPORT = /\bimport\(\s*(["'`])(\.{1,2}\/[^"'`\s]{1,300}?\.js)\1\s*\)/g;
-const LAZY_PACKAGE = /(?:"([^"\\]{1,100})"|([A-Za-z_$][\w$]{0,100})):\(\)=>import\(\s*(["'`])(\.\/[^"'`\s]{1,300}?\.js)\3\s*\)/g;
+const STATIC_IMPORT =
+	/\b(?:from|import)\s*(["'`])(\.{1,2}\/[^"'`\s]{1,300}?\.js)\1/g;
+const DYNAMIC_IMPORT =
+	/\bimport\(\s*(["'`])(\.{1,2}\/[^"'`\s]{1,300}?\.js)\1\s*\)/g;
+const LAZY_PACKAGE =
+	/(?:"([^"\\]{1,100})"|([A-Za-z_$][\w$]{0,100})):\(\)=>import\(\s*(["'`])(\.\/[^"'`\s]{1,300}?\.js)\3\s*\)/g;
 
 /** Relative imports of `file` (a path under `dir`), resolved, keeping only the files that exist. */
 function importsOf(dir, file, pattern) {
@@ -181,7 +204,11 @@ export function fileClosure(dir, entries) {
 
 /** The worker names `workers.ts` creates: `./typescript/typescript.worker.ts` is `typescript`. */
 export function workerNames(workersSource) {
-	const names = [...workersSource.matchAll(/new URL\(\s*'\.\/[\w/-]{0,200}?([\w-]+)\.worker\.ts'/g)].map((m) => m[1]);
+	const names = [
+		...workersSource.matchAll(
+			/new URL\(\s*'\.\/[\w/-]{0,200}?([\w-]+)\.worker\.ts'/g,
+		),
+	].map((m) => m[1]);
 	if (names.length === 0) throw new Error('workers.ts creates no worker');
 	return names;
 }
@@ -189,7 +216,8 @@ export function workerNames(workersSource) {
 /** Each package the runner's entry loads lazily, with the chunk it imports. */
 export function lazyPackages(runnerSource) {
 	const packages = new Map();
-	for (const match of runnerSource.matchAll(LAZY_PACKAGE)) packages.set(match[1] ?? match[2], match[4]);
+	for (const match of runnerSource.matchAll(LAZY_PACKAGE))
+		packages.set(match[1] ?? match[2], match[4]);
 	return packages;
 }
 
@@ -202,12 +230,19 @@ export function workerBundles(workersDir, names) {
 	const workers = new Map();
 	const runnerPackages = new Map();
 	for (const name of names) {
-		const entries = listing.filter((f) => f.startsWith(`${name}.worker-`) && f.endsWith('.js'));
-		if (entries.length !== 1) throw new Error(`expected one ${name}.worker-<hash>.js in ${workersDir}, found ${entries.length}`);
+		const entries = listing.filter(
+			(f) => f.startsWith(`${name}.worker-`) && f.endsWith('.js'),
+		);
+		if (entries.length !== 1)
+			throw new Error(
+				`expected one ${name}.worker-<hash>.js in ${workersDir}, found ${entries.length}`,
+			);
 		const closure = fileClosure(workersDir, entries);
 		workers.set(name, closure);
 		if (name !== 'runner') continue;
-		const lazy = lazyPackages(readFileSync(join(workersDir, entries[0]), 'utf8'));
+		const lazy = lazyPackages(
+			readFileSync(join(workersDir, entries[0]), 'utf8'),
+		);
 		for (const [pkg, chunk] of lazy) {
 			const files = fileClosure(workersDir, [posix.normalize(chunk)]);
 			for (const f of closure) files.delete(f);
@@ -242,14 +277,31 @@ export const budgetOf = (measured) => ({
  * Every bundle of a build with its size, named for a reader.
  * @returns {{group: string, key: string, name: string, size: {raw: number, gzip: number}}[]}
  */
-export function measureBuild({client, generatedApp, workersSource, soljsonPath}) {
-	const manifest = JSON.parse(readFileSync(join(client, '.vite/manifest.json'), 'utf8'));
-	const page = pageBundles(manifest, rootPageNode(readFileSync(generatedApp, 'utf8')));
+export function measureBuild({
+	client,
+	generatedApp,
+	workersSource,
+	soljsonPath,
+}) {
+	const manifest = JSON.parse(
+		readFileSync(join(client, '.vite/manifest.json'), 'utf8'),
+	);
+	const page = pageBundles(
+		manifest,
+		rootPageNode(readFileSync(generatedApp, 'utf8')),
+	);
 	const workersDir = join(client, '_app/immutable/workers');
-	const {workers, runnerPackages} = workerBundles(workersDir, workerNames(workersSource));
-	const declarations = readdirSync(join(workersDir, 'assets')).filter((f) => /^declarations-.*\.json$/.test(f));
+	const {workers, runnerPackages} = workerBundles(
+		workersDir,
+		workerNames(workersSource),
+	);
+	const declarations = readdirSync(join(workersDir, 'assets')).filter((f) =>
+		/^declarations-.*\.json$/.test(f),
+	);
 	if (declarations.length !== 1)
-		throw new Error(`expected one declarations-<hash>.json in ${workersDir}/assets, found ${declarations.length}`);
+		throw new Error(
+			`expected one declarations-<hash>.json in ${workersDir}/assets, found ${declarations.length}`,
+		);
 	const bundles = [
 		{
 			group: 'firstLoad',
@@ -289,7 +341,9 @@ export function measureBuild({client, generatedApp, workersSource, soljsonPath})
 		group: 'soljson',
 		key: '',
 		name: 'soljson',
-		size: measure(dirname(soljsonPath), [soljsonPath.slice(dirname(soljsonPath).length + 1)]),
+		size: measure(dirname(soljsonPath), [
+			soljsonPath.slice(dirname(soljsonPath).length + 1),
+		]),
 	});
 	return bundles;
 }
@@ -327,7 +381,9 @@ export function checkBudgets(bundles, budgets) {
 	for (const group of ['onDemand', 'workers', 'runnerPackages']) {
 		for (const key of Object.keys(budgets[group] ?? {})) {
 			if (!bundles.some((b) => b.group === group && b.key === key))
-				failures.push(`${group} ${key}: has a budget but is not in the build (remove it)`);
+				failures.push(
+					`${group} ${key}: has a budget but is not in the build (remove it)`,
+				);
 		}
 	}
 	return failures;
@@ -337,14 +393,22 @@ export function checkBudgets(bundles, budgets) {
 export function asBudgets(bundles, date) {
 	const lines = ['export const BUDGETS = {'];
 	const entry = (b) => `m(${b.size.raw}, ${b.size.gzip}, '${date}')`;
-	for (const group of ['firstLoad', 'onDemand', 'workers', 'runnerPackages', 'declarations', 'soljson']) {
+	for (const group of [
+		'firstLoad',
+		'onDemand',
+		'workers',
+		'runnerPackages',
+		'declarations',
+		'soljson',
+	]) {
 		const inGroup = bundles.filter((b) => b.group === group);
 		if (inGroup.length === 1 && inGroup[0].key === '') {
 			lines.push(`\t${group}: ${entry(inGroup[0])},`);
 			continue;
 		}
 		lines.push(`\t${group}: {`);
-		for (const b of inGroup) lines.push(`\t\t${JSON.stringify(b.key)}: ${entry(b)},`);
+		for (const b of inGroup)
+			lines.push(`\t\t${JSON.stringify(b.key)}: ${entry(b)},`);
 		lines.push('\t},');
 	}
 	lines.push('};');
@@ -357,7 +421,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const bundles = measureBuild({
 		client,
 		generatedApp: join(web, '.svelte-kit/generated/client-optimized/app.js'),
-		workersSource: readFileSync(join(web, 'src/lib/playground/workers.ts'), 'utf8'),
+		workersSource: readFileSync(
+			join(web, 'src/lib/playground/workers.ts'),
+			'utf8',
+		),
 		soljsonPath: join(client, 'solc', pinned.path),
 	});
 	if (process.argv.includes('--measure')) {
@@ -368,10 +435,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	for (const b of bundles) {
 		const measured = budgetEntry(BUDGETS, b);
 		const budget = measured ? budgetOf(measured) : undefined;
-		console.log(`${b.name}: ${b.size.raw} B raw / ${b.size.gzip} B gzip${budget ? ` (budget ${budget.raw} / ${budget.gzip})` : ''}`);
+		console.log(
+			`${b.name}: ${b.size.raw} B raw / ${b.size.gzip} B gzip${budget ? ` (budget ${budget.raw} / ${budget.gzip})` : ''}`,
+		);
 	}
 	if (failures.length > 0) {
-		console.error(`\n${failures.length} bundle budget(s) exceeded or missing:\n- ${failures.join('\n- ')}`);
+		console.error(
+			`\n${failures.length} bundle budget(s) exceeded or missing:\n- ${failures.join('\n- ')}`,
+		);
 		process.exit(1);
 	}
 	console.log(`\nall ${bundles.length} bundles are within their budgets`);

@@ -17,7 +17,9 @@ import {routeRockethLogs} from './log-hook.js';
 import {checkImports, createRegistry} from './registry.js';
 import {TEST_ADDRESSES, TEST_KEYS} from './test-keys.js';
 
-export type RequestProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
+export type RequestProvider = {
+	request(args: {method: string; params?: unknown}): Promise<unknown>;
+};
 
 export type RunInput = {
 	/** CommonJS per project path, from the TypeScript worker (`transpileProject`). */
@@ -31,7 +33,9 @@ export type RunDependencies = {
 	deploymentStore: DeploymentStore;
 	logs: LogStream;
 	/** Defaults to `BARE_MODULES`, each a dynamic import. */
-	loadPackages?: (names: BareModuleName[]) => Promise<Partial<Record<BareModuleName, object>>>;
+	loadPackages?: (
+		names: BareModuleName[],
+	) => Promise<Partial<Record<BareModuleName, object>>>;
 };
 
 export type RunError = {name: string; message: string; stack?: string};
@@ -63,27 +67,39 @@ export function deployScriptPaths(modules: ProjectFiles): string[] {
 		.sort();
 }
 
-export async function loadBareModules(names: BareModuleName[]): Promise<Partial<Record<BareModuleName, object>>> {
-	const loaded = await Promise.all(names.map(async (name) => [name, await BARE_MODULES[name]()] as const));
+export async function loadBareModules(
+	names: BareModuleName[],
+): Promise<Partial<Record<BareModuleName, object>>> {
+	const loaded = await Promise.all(
+		names.map(async (name) => [name, await BARE_MODULES[name]()] as const),
+	);
 	return Object.fromEntries(loaded);
 }
 
 /** Each name `composeConfig` gave a test key, with that key's address. */
-function composedNamedAccounts(accounts: Record<string, {default: string}>): Record<string, string> {
+function composedNamedAccounts(
+	accounts: Record<string, {default: string}>,
+): Record<string, string> {
 	const named: Record<string, string> = {};
 	for (const [name, {default: value}] of Object.entries(accounts)) {
-		const index = TEST_KEYS.indexOf(value.slice('privateKey:'.length) as (typeof TEST_KEYS)[number]);
+		const index = TEST_KEYS.indexOf(
+			value.slice('privateKey:'.length) as (typeof TEST_KEYS)[number],
+		);
 		if (index >= 0) named[name] = TEST_ADDRESSES[index];
 	}
 	return named;
 }
 
 function toRunError(error: unknown): RunError {
-	if (error instanceof Error) return {name: error.name, message: error.message, stack: error.stack};
+	if (error instanceof Error)
+		return {name: error.name, message: error.message, stack: error.stack};
 	return {name: 'Error', message: String(error)};
 }
 
-export async function runDeployScripts(input: RunInput, dependencies: RunDependencies): Promise<RunOutcome> {
+export async function runDeployScripts(
+	input: RunInput,
+	dependencies: RunDependencies,
+): Promise<RunOutcome> {
 	const {deploymentStore, logs} = dependencies;
 	const loadPackages = dependencies.loadPackages ?? loadBareModules;
 	const requests: Record<string, number> = {};
@@ -99,49 +115,86 @@ export async function runDeployScripts(input: RunInput, dependencies: RunDepende
 	let namedAccounts: Record<string, string> | undefined;
 	try {
 		const scripts = deployScriptPaths(input.modules);
-		if (!(CONFIG_PATH in input.modules)) throw new Error(`the project has no ${CONFIG_PATH}`);
+		if (!(CONFIG_PATH in input.modules))
+			throw new Error(`the project has no ${CONFIG_PATH}`);
 		// Every import is checked, and every package loaded, BEFORE any project file is evaluated:
 		// an unsupported import fails the run before a script has sent anything.
-		const needed = checkImports(input.modules, input.imports, [CONFIG_PATH, ...scripts]);
-		const packages = await loadPackages([...new Set<BareModuleName>([...needed, '@rocketh/web', '@rocketh/signer'])]);
+		const needed = checkImports(input.modules, input.imports, [
+			CONFIG_PATH,
+			...scripts,
+		]);
+		const packages = await loadPackages([
+			...new Set<BareModuleName>([
+				...needed,
+				'@rocketh/web',
+				'@rocketh/signer',
+			]),
+		]);
 		const web = packages['@rocketh/web'] as typeof import('@rocketh/web');
-		const signer = packages['@rocketh/signer'] as typeof import('@rocketh/signer');
+		const signer = packages[
+			'@rocketh/signer'
+		] as typeof import('@rocketh/signer');
 
 		const registry = createRegistry(input.modules, packages);
-		const configModule = registry.load(CONFIG_PATH) as {config?: unknown; extensions?: unknown};
+		const configModule = registry.load(CONFIG_PATH) as {
+			config?: unknown;
+			extensions?: unknown;
+		};
 		if (!configModule.config || !configModule.extensions) {
-			throw new Error(`${CONFIG_PATH} must export \`config\` and \`extensions\``);
+			throw new Error(
+				`${CONFIG_PATH} must export \`config\` and \`extensions\``,
+			);
 		}
 		const moduleObjects = scripts.map((path) => {
 			const exported = registry.load(path) as {default?: unknown};
 			if (typeof exported.default !== 'function') {
-				throw new Error(`${path} has no default export made with deployScript(...)`);
+				throw new Error(
+					`${path} has no default export made with deployScript(...)`,
+				);
 			}
 			return {id: path.slice('deploy/'.length), module: exported.default};
 		});
 
-		const config = composeConfig(configModule.config as Record<string, unknown>, signer.privateKey);
-		namedAccounts = composedNamedAccounts(config.accounts as Record<string, {default: string}>);
+		const config = composeConfig(
+			configModule.config as Record<string, unknown>,
+			signer.privateKey,
+		);
+		namedAccounts = composedNamedAccounts(
+			config.accounts as Record<string, {default: string}>,
+		);
 		const {loadAndExecuteDeploymentsFromModules} = web.setupEnvironment(
 			config as never,
 			configModule.extensions as never,
 			{deploymentStore},
 		);
-		const env = await loadAndExecuteDeploymentsFromModules(moduleObjects as never, {
-			provider: provider as never,
-			environment: ENVIRONMENT,
-			saveDeployments: true,
-			askBeforeProceeding: false,
-			// webevm has already mined by the time a send returns, and answers `evm_mine` with -32601.
-			autoMine: false,
-		} as never);
-		const deployments = Object.fromEntries(
-			Object.entries((env as unknown as {deployments: Record<string, {address: string}>}).deployments).map(
-				([name, d]) => [name, d.address],
-			),
+		const env = await loadAndExecuteDeploymentsFromModules(
+			moduleObjects as never,
+			{
+				provider: provider as never,
+				environment: ENVIRONMENT,
+				saveDeployments: true,
+				askBeforeProceeding: false,
+				// webevm has already mined by the time a send returns, and answers `evm_mine` with -32601.
+				autoMine: false,
+			} as never,
 		);
-		namedAccounts = {...(env as unknown as {namedAccounts: Record<string, string>}).namedAccounts};
-		return {ok: true, deployments, namedAccounts, requests, ms: performance.now() - t0};
+		const deployments = Object.fromEntries(
+			Object.entries(
+				(env as unknown as {deployments: Record<string, {address: string}>})
+					.deployments,
+			).map(([name, d]) => [name, d.address]),
+		);
+		namedAccounts = {
+			...(env as unknown as {namedAccounts: Record<string, string>})
+				.namedAccounts,
+		};
+		return {
+			ok: true,
+			deployments,
+			namedAccounts,
+			requests,
+			ms: performance.now() - t0,
+		};
 	} catch (error) {
 		const runError = toRunError(error);
 		logs.append('error', runError.message);

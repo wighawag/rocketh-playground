@@ -31,13 +31,18 @@ type AnyConfig = Record<string, unknown> & {
 	signerProtocols?: Record<string, unknown>;
 };
 
-export function composeConfig(userConfig: AnyConfig, privateKeyProtocol: unknown): AnyConfig {
+export function composeConfig(
+	userConfig: AnyConfig,
+	privateKeyProtocol: unknown,
+): AnyConfig {
 	const accounts: Record<string, {default: string}> = {};
 	const used = new Set<number>();
 	const declared = Object.entries(userConfig.accounts ?? {}).map(
-		([name, value]) => [name, (value as {default?: unknown} | undefined)?.default] as const,
+		([name, value]) =>
+			[name, (value as {default?: unknown} | undefined)?.default] as const,
 	);
-	for (const [, value] of declared) if (typeof value === 'number') used.add(value);
+	for (const [, value] of declared)
+		if (typeof value === 'number') used.add(value);
 	let next = 0;
 	for (const [name, value] of declared) {
 		let index: number;
@@ -49,7 +54,10 @@ export function composeConfig(userConfig: AnyConfig, privateKeyProtocol: unknown
 			used.add(index);
 		}
 		const key = TEST_KEYS[index];
-		if (!key) throw new Error(`account "${name}" needs test key ${index}, and the playground has ${TEST_KEYS.length}`);
+		if (!key)
+			throw new Error(
+				`account "${name}" needs test key ${index}, and the playground has ${TEST_KEYS.length}`,
+			);
 		accounts[name] = {default: `privateKey:${key}`};
 	}
 	const chains = userConfig.chains ?? {};
@@ -69,7 +77,13 @@ export function composeConfig(userConfig: AnyConfig, privateKeyProtocol: unknown
 				},
 			},
 		},
-		environments: {...(userConfig.environments ?? {}), [ENVIRONMENT]: {chain: CHAIN_ID}},
-		signerProtocols: {...(userConfig.signerProtocols ?? {}), privateKey: privateKeyProtocol},
+		environments: {
+			...(userConfig.environments ?? {}),
+			[ENVIRONMENT]: {chain: CHAIN_ID},
+		},
+		signerProtocols: {
+			...(userConfig.signerProtocols ?? {}),
+			privateKey: privateKeyProtocol,
+		},
 	};
 }

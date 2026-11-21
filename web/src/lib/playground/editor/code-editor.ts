@@ -19,14 +19,22 @@
 import {basicSetup, EditorView} from 'codemirror';
 import {javascript, typescriptLanguage} from '@codemirror/lang-javascript';
 import {solidity} from '@replit/codemirror-lang-solidity';
-import {tsAutocompleteWorker, tsFacetWorker, tsHoverWorker, tsLinterWorker} from '@valtown/codemirror-ts';
+import {
+	tsAutocompleteWorker,
+	tsFacetWorker,
+	tsHoverWorker,
+	tsLinterWorker,
+} from '@valtown/codemirror-ts';
 import {isTyped, vfsPath} from '../typescript/language-service-paths.js';
 
 /** What the editor's extensions call in the TypeScript worker (`@valtown/codemirror-ts`'s `WorkerShape`, less `getEnv`). */
 export type EditorLanguageService = {
 	updateFile(args: {path: string; code: string}): unknown;
 	getLints(args: {path: string; diagnosticCodesToIgnore: number[]}): unknown;
-	getAutocompletion(args: {path: string; context: {pos: number; explicit: boolean}}): unknown;
+	getAutocompletion(args: {
+		path: string;
+		context: {pos: number; explicit: boolean};
+	}): unknown;
 	getHover(args: {path: string; pos: number}): unknown;
 };
 
@@ -45,14 +53,19 @@ export type CodeEditor = {
 };
 
 /** Timings the e2e suite and the PR's measurements read: `performance.getEntriesByName(...)`. */
-export const MARKS = {usable: 'playground:editor-usable', attached: 'playground:language-service-attached'} as const;
+export const MARKS = {
+	usable: 'playground:editor-usable',
+	attached: 'playground:language-service-attached',
+} as const;
 
 function language(path: string, typed: boolean) {
 	if (path.endsWith('.sol')) return solidity;
 	if (/\.[cm]?[jt]s$/.test(path)) {
 		// With the language service attached, its completion replaces `javascript()`'s local one,
 		// which would list every name twice.
-		return typed ? typescriptLanguage : javascript({typescript: !/\.[cm]?js$/.test(path)});
+		return typed
+			? typescriptLanguage
+			: javascript({typescript: !/\.[cm]?js$/.test(path)});
 	}
 	return [];
 }
@@ -64,24 +77,64 @@ function language(path: string, typed: boolean) {
  * `@codemirror/language`'s `HighlightStyle`, which is not a dependency).
  */
 const theme = EditorView.theme({
-	'&': {height: '100%', backgroundColor: 'var(--background)', color: 'var(--foreground)'},
-	'.cm-scroller': {overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'},
-	'.cm-gutters': {backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRight: '1px solid var(--border)'},
-	'.cm-activeLine': {backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)'},
-	'.cm-activeLineGutter': {backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)'},
-	'.cm-cursor, .cm-dropCursor': {borderLeftColor: 'var(--foreground)'},
-	'&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
-		backgroundColor: 'color-mix(in oklab, var(--ring) 45%, transparent)',
+	'&': {
+		height: '100%',
+		backgroundColor: 'var(--background)',
+		color: 'var(--foreground)',
 	},
-	'.cm-tooltip': {backgroundColor: 'var(--popover)', color: 'var(--popover-foreground)', border: '1px solid var(--border)'},
-	'.cm-tooltip-autocomplete ul li[aria-selected]': {backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)'},
-	'.cm-tooltip-hover': {maxWidth: 'min(40rem, 90vw)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: '0.25rem 0.5rem'},
-	'.cm-diagnostic': {whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: 'min(40rem, 90vw)'},
+	'.cm-scroller': {
+		overflow: 'auto',
+		fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+	},
+	'.cm-gutters': {
+		backgroundColor: 'var(--muted)',
+		color: 'var(--muted-foreground)',
+		borderRight: '1px solid var(--border)',
+	},
+	'.cm-activeLine': {
+		backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
+	},
+	'.cm-activeLineGutter': {
+		backgroundColor: 'var(--accent)',
+		color: 'var(--accent-foreground)',
+	},
+	'.cm-cursor, .cm-dropCursor': {borderLeftColor: 'var(--foreground)'},
+	'&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground':
+		{
+			backgroundColor: 'color-mix(in oklab, var(--ring) 45%, transparent)',
+		},
+	'.cm-tooltip': {
+		backgroundColor: 'var(--popover)',
+		color: 'var(--popover-foreground)',
+		border: '1px solid var(--border)',
+	},
+	'.cm-tooltip-autocomplete ul li[aria-selected]': {
+		backgroundColor: 'var(--accent)',
+		color: 'var(--accent-foreground)',
+	},
+	'.cm-tooltip-hover': {
+		maxWidth: 'min(40rem, 90vw)',
+		whiteSpace: 'pre-wrap',
+		overflowWrap: 'anywhere',
+		padding: '0.25rem 0.5rem',
+	},
+	'.cm-diagnostic': {
+		whiteSpace: 'pre-wrap',
+		overflowWrap: 'anywhere',
+		maxWidth: 'min(40rem, 90vw)',
+	},
 	'.cm-panels': {backgroundColor: 'var(--muted)', color: 'var(--foreground)'},
-	'.cm-foldPlaceholder': {backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', border: 'none'},
+	'.cm-foldPlaceholder': {
+		backgroundColor: 'var(--muted)',
+		color: 'var(--muted-foreground)',
+		border: 'none',
+	},
 });
 
-export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, text: string) => void): CodeEditor {
+export function createCodeEditor(
+	parent: HTMLElement,
+	onEdit: (path: string, text: string) => void,
+): CodeEditor {
 	let view: EditorView | undefined;
 	let key: string | undefined;
 	let path = '';
@@ -91,7 +144,10 @@ export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, tex
 	function build(document: EditorDocument, typed: boolean) {
 		const previous = view && document.path === path ? view : undefined;
 		const keep = previous && {
-			anchor: Math.min(previous.state.selection.main.anchor, document.text.length),
+			anchor: Math.min(
+				previous.state.selection.main.anchor,
+				document.text.length,
+			),
 			head: Math.min(previous.state.selection.main.head, document.text.length),
 			scrollTop: previous.scrollDOM.scrollTop,
 			focused: previous.hasFocus,
@@ -108,16 +164,28 @@ export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, tex
 				theme,
 				narrow() ? EditorView.lineWrapping : [],
 				language(document.path, typed),
-				EditorView.contentAttributes.of({'aria-label': document.path, autocapitalize: 'off', autocorrect: 'off'}),
-				EditorView.editorAttributes.of({'data-language-service': service ? 'attached' : 'syntax'}),
+				EditorView.contentAttributes.of({
+					'aria-label': document.path,
+					autocapitalize: 'off',
+					autocorrect: 'off',
+				}),
+				EditorView.editorAttributes.of({
+					'data-language-service': service ? 'attached' : 'syntax',
+				}),
 				EditorView.updateListener.of((update) => {
-					if (update.docChanged && !replacing) onEdit(document.path, update.state.doc.toString());
+					if (update.docChanged && !replacing)
+						onEdit(document.path, update.state.doc.toString());
 				}),
 				service
 					? [
-							tsFacetWorker.of({worker: service as never, path: vfsPath(document.path)}),
+							tsFacetWorker.of({
+								worker: service as never,
+								path: vfsPath(document.path),
+							}),
 							tsLinterWorker(),
-							typescriptLanguage.data.of({autocomplete: tsAutocompleteWorker()}),
+							typescriptLanguage.data.of({
+								autocomplete: tsAutocompleteWorker(),
+							}),
 							tsHoverWorker(),
 						]
 					: [],
@@ -133,7 +201,8 @@ export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, tex
 
 	return {
 		show(document) {
-			const typed = isTyped(document.path) && document.languageService !== undefined;
+			const typed =
+				isTyped(document.path) && document.languageService !== undefined;
 			const next = `${document.path}\n${typed ? `typed ${document.revision ?? 0}` : 'syntax'}`;
 			if (next !== key || !view) {
 				key = next;
@@ -145,7 +214,9 @@ export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, tex
 			if (current === document.text) return;
 			replacing = true;
 			try {
-				view.dispatch({changes: {from: 0, to: current.length, insert: document.text}});
+				view.dispatch({
+					changes: {from: 0, to: current.length, insert: document.text},
+				});
 			} finally {
 				replacing = false;
 			}
@@ -159,10 +230,15 @@ export function createCodeEditor(parent: HTMLElement, onEdit: (path: string, tex
 }
 
 /** Tailwind's `md` breakpoint, below which the page is one column. */
-const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 767px)').matches;
+const narrow = () =>
+	typeof matchMedia !== 'undefined' && matchMedia('(max-width: 767px)').matches;
 
 /** The first time only: these are "how long until", not "how often". */
 function mark(name: string) {
-	if (typeof performance === 'undefined' || performance.getEntriesByName(name).length > 0) return;
+	if (
+		typeof performance === 'undefined' ||
+		performance.getEntriesByName(name).length > 0
+	)
+		return;
 	performance.mark(name);
 }

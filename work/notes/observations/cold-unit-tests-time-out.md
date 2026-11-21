@@ -1,0 +1,1 @@
+2026-11-21: the first `pnpm verify` right after a fresh `pnpm i` in a new worktree failed `web:test` with 21 tests (pipeline, session, language-service, v1-script, workers) hitting vitest's 5000 ms default timeout (run took 30 s); an immediate rerun passed all 303 in 10 s. The compile/transpile tests seem to depend on a warm cache, so a cold CI machine may see them fail.

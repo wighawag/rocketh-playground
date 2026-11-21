@@ -12,10 +12,20 @@ import type {ProjectFiles} from '../project/template.js';
 export type SolidityCompile = (standardJSONInput: string) => string;
 
 /** The subset of soljson's emscripten `Module` the playground uses. */
-export type Soljson = {cwrap: (name: string, ret: string, args: string[]) => (...args: unknown[]) => unknown};
+export type Soljson = {
+	cwrap: (
+		name: string,
+		ret: string,
+		args: string[],
+	) => (...args: unknown[]) => unknown;
+};
 
 export function solidityCompileOf(soljson: Soljson): SolidityCompile {
-	const compile = soljson.cwrap('solidity_compile', 'string', ['string', 'number', 'number']);
+	const compile = soljson.cwrap('solidity_compile', 'string', [
+		'string',
+		'number',
+		'number',
+	]);
 	// A null import callback: v1 compiles `contracts/` alone, and an import fails in solc with
 	// "File import callback not supported", located at the import.
 	return (input) => compile(input, 0, 0) as string;
@@ -38,7 +48,11 @@ type SolcContract = {
 	userdoc?: unknown;
 	evm: {
 		bytecode: {object: string; linkReferences?: unknown};
-		deployedBytecode: {object: string; linkReferences?: unknown; immutableReferences?: unknown};
+		deployedBytecode: {
+			object: string;
+			linkReferences?: unknown;
+			immutableReferences?: unknown;
+		};
 		methodIdentifiers?: unknown;
 	};
 };
@@ -46,7 +60,12 @@ type SolcContract = {
 /** The project's Solidity sources: `contracts/**.sol`, minus Foundry tests (`*.t.sol`). */
 export function soliditySources(files: ProjectFiles): ProjectFiles {
 	return Object.fromEntries(
-		Object.entries(files).filter(([path]) => path.startsWith('contracts/') && path.endsWith('.sol') && !path.endsWith('.t.sol')),
+		Object.entries(files).filter(
+			([path]) =>
+				path.startsWith('contracts/') &&
+				path.endsWith('.sol') &&
+				!path.endsWith('.t.sol'),
+		),
 	);
 }
 
@@ -54,12 +73,22 @@ export function soliditySources(files: ProjectFiles): ProjectFiles {
 export function standardJSONInput(sources: ProjectFiles) {
 	return {
 		language: 'Solidity',
-		sources: Object.fromEntries(Object.entries(sources).map(([path, content]) => [path, {content}])),
+		sources: Object.fromEntries(
+			Object.entries(sources).map(([path, content]) => [path, {content}]),
+		),
 		settings: {
 			optimizer: {enabled: false, runs: 200},
 			outputSelection: {
 				'*': {
-					'*': ['abi', 'metadata', 'devdoc', 'userdoc', 'evm.bytecode', 'evm.deployedBytecode', 'evm.methodIdentifiers'],
+					'*': [
+						'abi',
+						'metadata',
+						'devdoc',
+						'userdoc',
+						'evm.bytecode',
+						'evm.deployedBytecode',
+						'evm.methodIdentifiers',
+					],
 				},
 			},
 		},
@@ -67,14 +96,26 @@ export function standardJSONInput(sources: ProjectFiles) {
 }
 
 /** solc's errors and warnings, located in the file they are about. */
-export function solcDiagnostics(output: SolcOutput, sources: ProjectFiles): Diagnostic[] {
+export function solcDiagnostics(
+	output: SolcOutput,
+	sources: ProjectFiles,
+): Diagnostic[] {
 	return (output.errors ?? [])
 		.filter((e) => e.severity === 'error' || e.severity === 'warning')
 		.map((e) => {
 			const location = e.sourceLocation;
 			const file = location?.file ?? '';
-			const at = location && sources[file] !== undefined ? lineAndColumn(sources[file], location.start) : {line: 1, column: 1};
-			return {file, ...at, message: e.message, severity: e.severity as 'error' | 'warning', source: 'solc' as const};
+			const at =
+				location && sources[file] !== undefined
+					? lineAndColumn(sources[file], location.start)
+					: {line: 1, column: 1};
+			return {
+				file,
+				...at,
+				message: e.message,
+				severity: e.severity as 'error' | 'warning',
+				source: 'solc' as const,
+			};
 		});
 }
 
@@ -93,11 +134,16 @@ export function solcDiagnostics(output: SolcOutput, sources: ProjectFiles): Diag
  * service reads, which is what makes `artifacts.Counter` typed and a wrong constructor argument an
  * error before Deploy.
  */
-export function generateArtifactModules(output: SolcOutput): {modules: ProjectFiles; types: ProjectFiles} {
+export function generateArtifactModules(output: SolcOutput): {
+	modules: ProjectFiles;
+	types: ProjectFiles;
+} {
 	const modules: ProjectFiles = {};
 	const types: ProjectFiles = {};
 	let index = '';
-	for (const [sourceName, contracts] of Object.entries(output.contracts ?? {})) {
+	for (const [sourceName, contracts] of Object.entries(
+		output.contracts ?? {},
+	)) {
 		for (const [contractName, c] of Object.entries(contracts)) {
 			if (!c.evm.bytecode.object) continue; // an interface or an abstract contract
 			const artifact = {
@@ -116,8 +162,10 @@ export function generateArtifactModules(output: SolcOutput): {modules: ProjectFi
 				evm: {methodIdentifiers: c.evm.methodIdentifiers},
 			};
 			const json = JSON.stringify(artifact, null, 2);
-			modules[`generated/artifacts/${contractName}.js`] = `export const Artifact_${contractName} = /** @type {const} **/ (${json});\n`;
-			types[`generated/artifacts/${contractName}.d.ts`] = `export declare const Artifact_${contractName}: ${json};\n`;
+			modules[`generated/artifacts/${contractName}.js`] =
+				`export const Artifact_${contractName} = /** @type {const} **/ (${json});\n`;
+			types[`generated/artifacts/${contractName}.d.ts`] =
+				`export declare const Artifact_${contractName}: ${json};\n`;
 			index += `export {Artifact_${contractName} as ${contractName}} from './${contractName}.js';\n`;
 		}
 	}
@@ -136,11 +184,23 @@ export type CompileResult = {
 };
 
 /** Compile the project's Solidity and generate its artifact modules. */
-export function compileProject(compile: SolidityCompile, files: ProjectFiles): CompileResult {
+export function compileProject(
+	compile: SolidityCompile,
+	files: ProjectFiles,
+): CompileResult {
 	const sources = soliditySources(files);
-	const output = JSON.parse(compile(JSON.stringify(standardJSONInput(sources)))) as SolcOutput;
+	const output = JSON.parse(
+		compile(JSON.stringify(standardJSONInput(sources))),
+	) as SolcOutput;
 	const diagnostics = solcDiagnostics(output, sources);
 	const ok = !diagnostics.some((d) => d.severity === 'error');
-	const generated = ok ? generateArtifactModules(output) : {modules: {}, types: {}};
-	return {artifacts: generated.modules, types: generated.types, diagnostics, ok};
+	const generated = ok
+		? generateArtifactModules(output)
+		: {modules: {}, types: {}};
+	return {
+		artifacts: generated.modules,
+		types: generated.types,
+		diagnostics,
+		ok,
+	};
 }
