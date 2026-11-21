@@ -1,12 +1,13 @@
 ---
 title: 'Open in playground: a sample on rocketh.dev opens in the playground, as a project that is known to deploy'
 slug: open-in-playground
-humanOnly: true
 ---
 
 > Launch snapshot: records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) and the code; remaining work: `work/tasks/ready/` tasks. (The technical-detail sections below are trimmed by `to-task` once the work is tasked: they move into tasks or ADRs, and this spec settles to its durable framing of Problem, Solution, User Stories and Out of Scope.)
 
-This follows a decision in `work/specs/tasked/rocketh-playground.md` ("Open in playground" on rocketh.dev comes right after v1). It spans three repositories: rocketh (the documentation's content), rocketh-website (the site that renders it) and this one. It lives here because the decision it follows does. `humanOnly` because tasking it means cutting tasks in all three.
+This follows a decision in `work/specs/tasked/rocketh-playground.md` ("Open in playground" on rocketh.dev comes right after v1). It spans three repositories: rocketh (the documentation's content), rocketh-website (the site that renders it) and this one. It lives here because the decision it follows does.
+
+**Tasked 2026-11-20.** On this board: `project-link-overlay-encoding`, `runner-resolves-rocketh-router`, and two tasks built in other repositories that have no `work/` board, `docs-engine-code-block-actions` (template-svelte-docs) and `rocketh-website-open-in-playground` (rocketh-website). On rocketh's board: `playground-examples-check`, `playground-examples-first-batch`, `playground-examples-proxies-and-diamonds` and `playground-examples-remaining`.
 
 ## Problem Statement
 
@@ -50,7 +51,7 @@ Answered by the maintainer on 2026-11-20, taking the recommendation each time:
 - **The encoder is copied, not published.** rocketh-website keeps its own copy of the encoding (about forty lines today in `web/src/lib/playground/project/share-link.ts`: JSON, deflated with `fflate`, base64url without padding, the version prefix), held to this repository's by a shared test vector: a fixed set of files and the exact link value both must produce. rocketh-website gains `fflate` as a dependency, which is approved with this answer.
 - **Examples live in rocketh**, as `examples/playground/<name>/`, each holding only the files that differ from the starting project (`contracts/*.sol`, `deploy/*.ts`, and `rocketh/config.ts` when the example needs another extension). A marked sample names the example and the file in its info string, for example ` ```typescript playground=proxies/deploy/01_deploy_greetings_registry.ts `, and its body must equal that file byte for byte.
 - **The check runs in rocketh's CI**, as a docs test beside `test:docs:hardhat-deploy-init` (`scripts/test-doc.sh`): for each example, the published `hardhat-deploy init` template in a temporary folder, the example's files over it, `pnpm hardhat compile`, `pnpm hardhat deploy` on the in-memory network. This repository's `pnpm test:export` (`test/export/installs-and-deploys.export.ts`) is what makes that equivalent to a run in the tab.
-- **The first batch** is the pages whose samples need only the extensions the starting config registers (`@rocketh/deploy`, `@rocketh/read-execute`, `@rocketh/viem`): `documentation/deploy-scripts/`, `documentation/deploy-contracts/`, `documentation/deterministic-addresses/`, `documentation/viem/` and `hardhat-deploy/typed-artifacts/`. Proxies, routers and diamonds come second, once it is checked that the playground's runner resolves `@rocketh/proxy` and `@rocketh/diamond` (`web/src/lib/playground/runner/bare-modules.ts`).
+- **The first batch** is the pages whose samples need only the extensions the starting config registers (`@rocketh/deploy`, `@rocketh/read-execute`, `@rocketh/viem`): `documentation/deploy-scripts/`, `documentation/deploy-contracts/`, `documentation/deterministic-addresses/`, `documentation/viem/` and `hardhat-deploy/typed-artifacts/`. Proxies, routers and diamonds come second. Checked at tasking: the runner already resolves `@rocketh/proxy` and `@rocketh/diamond` (`web/src/lib/playground/runner/bare-modules.ts`) but not `@rocketh/router`, which `deployViaRouter` comes from, and the `hardhat-deploy init` template does not depend on `@rocketh/diamond`.
 
 Also decided:
 
