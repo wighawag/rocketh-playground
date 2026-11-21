@@ -12,6 +12,8 @@ import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {
+	bareProject,
+	COUNTER_SAMPLE_PATHS,
 	startingProject,
 	type ProjectFiles,
 } from '../../src/lib/playground/project/template.js';
@@ -87,6 +89,17 @@ function routedCounter(): ProjectFiles {
 	return files;
 }
 
+/** The bare base with the bare link vector's files over it (Greeter), as such a link opens it. */
+function bareGreeter(): ProjectFiles {
+	const vector = JSON.parse(
+		readFileSync(
+			new URL('../lib/playground/overlay-link-bare-vector.json', import.meta.url),
+			'utf8',
+		),
+	) as {files: ProjectFiles};
+	return {...bareProject(), ...vector.files};
+}
+
 /** The one temporary folder: the pnpm store, the XDG folders and the projects. */
 let root: string;
 let env: NodeJS.ProcessEnv;
@@ -147,6 +160,16 @@ describe('the exported project', () => {
 		for (const path of COUNTER_TESTS)
 			expect(exists(join(project, path)), path).toBe(false);
 		expect(exists(join(project, 'artifacts'))).toBe(true);
+	});
+
+	it("installs, compiles and deploys a bare link's project: Greeter, without the Counter sample or its tests", async () => {
+		const {project, outputs} = await exportAndDeploy('bare-greeter', bareGreeter());
+		for (const path of [...COUNTER_SAMPLE_PATHS, ...COUNTER_TESTS])
+			expect(exists(join(project, path)), path).toBe(false);
+		expect(exists(join(project, 'contracts/Greeter.sol'))).toBe(true);
+		const deployed = outputs['pnpm hardhat deploy'];
+		expect(deployed).toContain('Greeter');
+		expect(deployed).not.toContain('Counter');
 	});
 
 	it('installs, compiles and deploys a project importing packages the template lacks', async () => {

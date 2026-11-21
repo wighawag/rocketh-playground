@@ -39,12 +39,41 @@ export const STARTING_PROJECT_PATHS = [
 	'rocketh/deploy.ts',
 ] as const;
 
-export function startingProject(): ProjectFiles {
+/**
+ * The starting project's Counter sample: its contract and its deploy script. A `2.` link with
+ * `"base": "bare"` opens without them (`bareProject()`), and Download leaves out the template's
+ * Counter tests when a project lacks either (`export-project.ts`).
+ *
+ * rocketh keeps a copy of this list in `scripts/test-playground-examples.sh` (its deploy check
+ * removes these files, and the Counter tests, before writing an example over the template), so
+ * that an example deploys there on the base it opens on here: a change to one is made in both.
+ */
+export const COUNTER_SAMPLE_PATHS = ['contracts/Counter.sol', 'deploy/01_deploy_counter.ts'] as const;
+
+/** The template's files at `paths`; throws when one is missing, so a template change is noticed. */
+function templateFiles(paths: readonly string[]): ProjectFiles {
 	const files: ProjectFiles = {};
-	for (const path of STARTING_PROJECT_PATHS) {
+	for (const path of paths) {
 		const text = TEMPLATE_FILES[path];
 		if (text === undefined) throw new Error(`the project template has no ${path}`);
 		files[path] = text;
 	}
 	return files;
+}
+
+export function startingProject(): ProjectFiles {
+	return templateFiles(STARTING_PROJECT_PATHS);
+}
+
+/**
+ * The bare base a `2.` link with `"base": "bare"` opens over: the starting project without its
+ * Counter sample (`COUNTER_SAMPLE_PATHS`), so `rocketh/config.ts` and `rocketh/deploy.ts`. It
+ * throws when a Counter sample file is missing from the template, as `startingProject()` throws
+ * for a starting file, so a template update that renamed or removed one fails the tests rather
+ * than leaving `Counter` in every opened example.
+ */
+export function bareProject(): ProjectFiles {
+	templateFiles(COUNTER_SAMPLE_PATHS);
+	const sample: readonly string[] = COUNTER_SAMPLE_PATHS;
+	return templateFiles(STARTING_PROJECT_PATHS.filter((path) => !sample.includes(path)));
 }

@@ -3,7 +3,8 @@
  * `pnpm i && pnpm hardhat compile && pnpm hardhat deploy`.
  *
  * It is the template's files (`web/project-template/`, the published `hardhat-deploy init`
- * template) with the reader's files over them, and three changes: package.json's `workspace:*`
+ * template) with the reader's files over them, less any starting file (`STARTING_PROJECT_PATHS`)
+ * the project did not hold, so that what installs is what the tab held, and three changes: package.json's `workspace:*`
  * becomes the published hardhat-deploy version, every package the playground also pins gets the
  * playground's version (what ran in the tab is what installs), a package the project imports that
  * the template does not depend on is added at that version, and the README opens with where
@@ -16,7 +17,13 @@
  */
 import {strToU8, zipSync} from 'fflate';
 import playground from '../../../../package.json';
-import {TEMPLATE_FILES, TEMPLATE_SOURCE, type ProjectFiles} from './template';
+import {
+	COUNTER_SAMPLE_PATHS,
+	STARTING_PROJECT_PATHS,
+	TEMPLATE_FILES,
+	TEMPLATE_SOURCE,
+	type ProjectFiles,
+} from './template';
 
 /** The name of the downloaded file, and of the folder it unzips to. */
 export const PROJECT_NAME = 'rocketh-playground-project';
@@ -30,7 +37,9 @@ export const PROJECT_COMMANDS =
  * The template's tests of its Counter contract. The reader never sees them, and they call
  * Counter's functions by name, so they are left out when the reader changed `contracts/Counter.sol`:
  * `hardhat build` (what `compile` runs) also compiles Solidity tests, and a test of a Counter that
- * is no more would stop it.
+ * is no more would stop it. They are left out too when the project lacks either file of the
+ * Counter sample (`COUNTER_SAMPLE_PATHS`, as a bare link opens): `test/Counter.ts` expects a
+ * `Counter` deployment.
  */
 export const COUNTER_TESTS = [
 	'contracts/Counter.t.sol',
@@ -148,8 +157,25 @@ export function exportedPackageJson(
 	return `${JSON.stringify(pkg, null, 2)}\n`;
 }
 
-/** The section the README opens with. */
-export function readmePreamble(droppedTests: readonly string[]): string {
+/** `a`, `a` and `b`, or `a`, `b` and `c`, each in backticks. */
+function pathList(paths: readonly string[]): string {
+	const quoted = paths.map((p) => `\`${p}\``);
+	return quoted.length < 2
+		? quoted.join('')
+		: `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
+}
+
+/**
+ * The section the README opens with. `droppedTests` are the Counter tests left out, and `absent`
+ * the starting files the project did not hold (left out too): the tests were dropped for those
+ * when one of them is a Counter sample file, and because Counter changed otherwise.
+ */
+export function readmePreamble(
+	droppedTests: readonly string[],
+	absent: readonly string[] = [],
+): string {
+	const sample: readonly string[] = COUNTER_SAMPLE_PATHS;
+	const absentSample = absent.filter((p) => sample.includes(p));
 	const lines = [
 		'# From the rocketh playground',
 		'',
@@ -161,10 +187,18 @@ export function readmePreamble(droppedTests: readonly string[]): string {
 		'',
 		"The packages in `package.json` that the playground runs (rocketh and its extensions, viem, TypeScript) have the versions it ran. The playground's deployment records are not included, since their chain only existed in your browser tab, and neither are its accounts: they were throwaway test keys, given to the deploy scripts at run time.",
 	];
+	if (absent.length > 0) {
+		lines.push(
+			'',
+			`The template's ${pathList(absent)} ${absent.length === 1 ? 'is' : 'are'} left out because your project in the playground did not have ${absent.length === 1 ? 'it' : 'them'}.`,
+		);
+	}
 	if (droppedTests.length > 0) {
 		lines.push(
 			'',
-			`The template's tests of its Counter contract (${droppedTests.map((p) => `\`${p}\``).join(' and ')}) are left out because you changed \`${COUNTER}\`: they would no longer match it.`,
+			absentSample.length > 0
+				? `The template's tests of its Counter contract (${pathList(droppedTests)}) are left out because your project has no ${pathList(absentSample)}: they test a Counter deployment it does not make.`
+				: `The template's tests of its Counter contract (${droppedTests.map((p) => `\`${p}\``).join(' and ')}) are left out because you changed \`${COUNTER}\`: they would no longer match it.`,
 		);
 	}
 	lines.push(
@@ -184,20 +218,27 @@ const isRecord = (path: string) =>
 
 /**
  * The exported project's files, by path relative to its root: the template's, the reader's over
- * them, with package.json and the README changed as above.
+ * them, less the starting files the reader's project lacks (and the Counter tests, as above),
+ * with package.json and the README changed as above.
  */
 export function exportedProject(
 	files: ProjectFiles,
 	options: ExportOptions = {},
 ): ProjectFiles {
+	const absent: string[] = STARTING_PROJECT_PATHS.filter(
+		(p) => p in TEMPLATE_FILES && !(p in files),
+	);
 	const counterChanged =
 		files[COUNTER] !== undefined && files[COUNTER] !== TEMPLATE_FILES[COUNTER];
-	const dropped: string[] = counterChanged
-		? COUNTER_TESTS.filter((p) => p in TEMPLATE_FILES && !(p in files))
-		: [];
+	const counterAbsent = COUNTER_SAMPLE_PATHS.some((p) => absent.includes(p));
+	const dropped: string[] =
+		counterChanged || counterAbsent
+			? COUNTER_TESTS.filter((p) => p in TEMPLATE_FILES && !(p in files))
+			: [];
 	const out: ProjectFiles = {};
 	for (const [path, text] of Object.entries({...TEMPLATE_FILES, ...files})) {
-		if (isRecord(path) || dropped.includes(path)) continue;
+		if (isRecord(path) || dropped.includes(path) || absent.includes(path))
+			continue;
 		out[path] = text;
 	}
 	out['package.json'] = exportedPackageJson(
@@ -205,7 +246,7 @@ export function exportedProject(
 		options.versions,
 		importedPackages(out),
 	);
-	out['README.md'] = readmePreamble(dropped) + (out['README.md'] ?? '');
+	out['README.md'] = readmePreamble(dropped, absent) + (out['README.md'] ?? '');
 	return out;
 }
 

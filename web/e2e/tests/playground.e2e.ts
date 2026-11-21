@@ -611,6 +611,35 @@ test("a `2.` link (rocketh.dev's Open in playground) opens the starting project 
 	await expect(page.locator(TRANSCRIPT)).not.toContainText('Executing');
 });
 
+/** The bare `2.` vector: the same files and `select`, with `"base": "bare"`. */
+const BARE_VECTOR = JSON.parse(readFileSync(new URL('../../test/lib/playground/overlay-link-bare-vector.json', import.meta.url), 'utf8')) as {
+	files: Record<string, string>;
+	select: string;
+	base: 'bare';
+	value: string;
+};
+
+test("a bare `2.` link opens only its files and the starting project's rocketh config, without Counter, its file selected, and nothing runs", async ({page}) => {
+	const added = Object.keys(BARE_VECTOR.files);
+	expect(added).toContain(BARE_VECTOR.select);
+	await page.goto(`${PLAIN_URL}/#project=${BARE_VECTOR.value}`);
+	await expect(page.locator(TRANSCRIPT)).toContainText('Opened the shared project', {timeout: 60_000});
+	await ready(page);
+	await noProjectKeyInURL(page);
+	await expect(page.getByTestId('link-dialog')).toBeHidden();
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(page.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(page.getByTestId('last-run')).toBeHidden();
+	// the link's files and rocketh's config and setup, nothing of the Counter sample
+	const files = page.locator('[data-testid="project-files"] [data-path]');
+	await expect(files).toHaveCount(2 + added.length);
+	for (const path of ['rocketh/config.ts', 'rocketh/deploy.ts', ...added]) await expect(page.locator(`[data-testid="project-files"] [data-path="${path}"]`)).toBeVisible();
+	for (const path of [COUNTER, DEPLOY]) await expect(page.locator(`[data-testid="project-files"] [data-path="${path}"]`)).toHaveCount(0);
+	await expect(editor(page)).toHaveAttribute('aria-label', BARE_VECTOR.select);
+	await expect(editor(page)).toContainText("await deploy('Greeter', {");
+	await expect(page.locator(TRANSCRIPT)).not.toContainText('Executing');
+});
+
 test('a corrupted link is reported and loads nothing', async ({page}) => {
 	await page.goto(`${PLAIN_URL}/#project=1.notaproject`);
 	await expect(page.getByTestId('link-error')).toContainText('The shared link could not be opened: it is corrupted or cut short.');

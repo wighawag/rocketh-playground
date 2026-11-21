@@ -8,7 +8,10 @@ import {get} from 'svelte/store';
 import {strFromU8, unzipSync} from 'fflate';
 import playground from '../../../package.json';
 import {
+	bareProject,
+	COUNTER_SAMPLE_PATHS,
 	startingProject,
+	STARTING_PROJECT_PATHS,
 	TEMPLATE_FILES,
 	TEMPLATE_SOURCE,
 	type ProjectFiles,
@@ -16,6 +19,8 @@ import {
 import {
 	COUNTER_TESTS,
 	exportedPackageJson,
+	exportedProject,
+	readmePreamble,
 	importedPackages,
 	PLAYGROUND_VERSIONS,
 	PROJECT_COMMANDS,
@@ -179,6 +184,51 @@ describe('the downloaded project', () => {
 				.filter((p) => !(COUNTER_TESTS as readonly string[]).includes(p))
 				.sort(),
 		);
+	});
+
+	it('writes only the starting files the project held: without Counter, its sample and its tests are left out, as the README says', () => {
+		const greeter = {
+			'contracts/Greeter.sol': '// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\ncontract Greeter {}\n',
+			'deploy/02_deploy_greeter.ts': '// deploys Greeter\n',
+		};
+		const files = unzip(zipProject({...bareProject(), ...greeter}));
+		expectAnExport(files);
+		for (const path of [...COUNTER_SAMPLE_PATHS, ...COUNTER_TESTS]) expect(files, path).not.toHaveProperty(path);
+		expect(files['contracts/Greeter.sol']).toBe(greeter['contracts/Greeter.sol']);
+		expect(files['rocketh/config.ts']).toBe(TEMPLATE_FILES['rocketh/config.ts']);
+		expect(Object.keys(files).sort()).toEqual(
+			[
+				...Object.keys(TEMPLATE_FILES).filter(
+					(p) => !([...COUNTER_SAMPLE_PATHS, ...COUNTER_TESTS] as string[]).includes(p),
+				),
+				...Object.keys(greeter),
+			].sort(),
+		);
+		expect(files['README.md']).toContain(
+			"The template's `contracts/Counter.sol` and `deploy/01_deploy_counter.ts` are left out because your project in the playground did not have them.",
+		);
+		expect(files['README.md']).toContain(
+			"The template's tests of its Counter contract (`contracts/Counter.t.sol` and `test/Counter.ts`) are left out because your project has no `contracts/Counter.sol` and `deploy/01_deploy_counter.ts`: they test a Counter deployment it does not make.",
+		);
+	});
+
+	it('leaves out any starting file the project lacks, and the Counter tests when either Counter file is gone', () => {
+		for (const path of STARTING_PROJECT_PATHS) {
+			const files = startingProject();
+			delete files[path];
+			const out = exportedProject(files);
+			expect(out, path).not.toHaveProperty(path);
+			expect(out['README.md']).toContain(`The template's \`${path}\` is left out because your project in the playground did not have it.`);
+			const counterGone = (COUNTER_SAMPLE_PATHS as readonly string[]).includes(path);
+			for (const test of COUNTER_TESTS) expect(test in out, `${path}: ${test}`).toBe(!counterGone);
+			if (counterGone) expect(out['README.md']).toContain(`because your project has no \`${path}\`: they test a Counter deployment it does not make.`);
+		}
+	});
+
+	it('downloads a project holding every starting file exactly as before: no file left out, nothing said', () => {
+		const out = exportedProject(startingProject());
+		expect(out['README.md']).toBe(readmePreamble([]) + TEMPLATE_FILES['README.md']);
+		expect(out['README.md']).not.toContain('left out');
 	});
 
 	it('adds every package the project imports that the template lacks, at the version the playground runs', () => {
