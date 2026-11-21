@@ -45,7 +45,7 @@ const errors = (service: Awaited<ReturnType<typeof serviceFor>>, path: string) =
 
 describe('the declarations', () => {
 	it('hold every package a project may import, and the lib that declares console', () => {
-		for (const name of ['rocketh', '@rocketh/deploy', '@rocketh/unknown-signer', 'viem', 'abitype', 'eip-1193']) {
+		for (const name of ['rocketh', '@rocketh/deploy', '@rocketh/router', '@rocketh/unknown-signer', 'viem', 'abitype', 'eip-1193']) {
 			expect(declarations.files[`/node_modules/${name}/package.json`], name).toBeDefined();
 		}
 		expect(declarations.libs['/lib.webworker.d.ts']).toContain('declare var console: Console;');
@@ -72,6 +72,24 @@ describe('the language service', () => {
 		expect(errors(service, DEPLOY)).toMatchObject([{line: 10, message: "Type 'number' is not assignable to type 'bigint'."}]);
 		service.setFile(DEPLOY, deployWith(files, 'args: [1n],'));
 		expect(service.diagnostics(DEPLOY)).toEqual([]);
+	});
+
+	it('types deployViaRouter once rocketh/config.ts spreads @rocketh/router', async () => {
+		const files = project();
+		const config = files['rocketh/config.ts']
+			.replace("import * as viemExtension from '@rocketh/viem';", "import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';")
+			.replace('...viemExtension,', '...viemExtension,\n\t...routerExtension,');
+		const script =
+			"import {deployScript, artifacts} from '../rocketh/deploy.js';\n\n" +
+			'export default deployScript(\n\tasync ({deployViaRouter, namedAccounts}) => {\n' +
+			"\t\tawait deployViaRouter('Counter', {account: namedAccounts.deployer}, [{name: 'Counter', artifact: artifacts.Counter}]);\n\t},\n" +
+			"\t{tags: ['Counter']},\n);\n";
+		const service = await serviceFor({...files, 'rocketh/config.ts': config, [DEPLOY]: script});
+		expect(service.diagnostics('rocketh/config.ts')).toEqual([]);
+		expect(service.diagnostics(DEPLOY)).toEqual([]);
+		// and without the extension, the script's deployViaRouter is not there
+		service.setFile('rocketh/config.ts', files['rocketh/config.ts']);
+		expect(errors(service, DEPLOY).map((d) => d.message).join('\n')).toContain('deployViaRouter');
 	});
 
 	it('flags a misspelled deploy option', async () => {

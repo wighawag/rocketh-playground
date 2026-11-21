@@ -16,6 +16,8 @@ import {
 import {
 	COUNTER_TESTS,
 	exportedPackageJson,
+	importedPackages,
+	PLAYGROUND_VERSIONS,
 	PROJECT_COMMANDS,
 	PROJECT_NAME,
 	ZIP_NAME,
@@ -27,6 +29,10 @@ import {
 	downloadProject,
 } from '../../../src/lib/playground/project/download.js';
 import {TEST_KEYS} from '../../../src/lib/playground/runner/test-keys.js';
+import {
+	BARE_MODULE_NAMES,
+	TYPE_ONLY_MODULES,
+} from '../../../src/lib/playground/runner/bare-modules.js';
 
 type PackageJson = Record<string, unknown> & {
 	devDependencies: Record<string, string>;
@@ -173,6 +179,91 @@ describe('the downloaded project', () => {
 				.filter((p) => !(COUNTER_TESTS as readonly string[]).includes(p))
 				.sort(),
 		);
+	});
+
+	it('adds every package the project imports that the template lacks, at the version the playground runs', () => {
+		const config = TEMPLATE_FILES['rocketh/config.ts']
+			.replace(
+				"import * as viemExtension from '@rocketh/viem';",
+				"import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';\nimport * as diamondExtension from '@rocketh/diamond';",
+			)
+			.replace(
+				'...viemExtension,',
+				'...viemExtension,\n\t...routerExtension,\n\t...diamondExtension,',
+			);
+		expect(config).toContain('...diamondExtension,');
+		const files = unzip(
+			zipProject({...startingProject(), 'rocketh/config.ts': config}),
+		);
+		const pkg = JSON.parse(files['package.json']) as PackageJson;
+		// where the template keeps its rocketh packages, in order, and nothing else changed
+		expect(pkg).not.toHaveProperty('dependencies');
+		expect(pkg.devDependencies['@rocketh/router']).toBe(
+			webSpecs['@rocketh/router'],
+		);
+		expect(pkg.devDependencies['@rocketh/diamond']).toBe(
+			webSpecs['@rocketh/diamond'],
+		);
+		expect(Object.keys(pkg.devDependencies)).toEqual(
+			[
+				...Object.keys(templatePackage.devDependencies),
+				'@rocketh/diamond',
+				'@rocketh/router',
+			].sort(),
+		);
+		const starting = JSON.parse(
+			unzip(zipProject(startingProject()))['package.json'],
+		) as PackageJson;
+		for (const [name, spec] of Object.entries(starting.devDependencies))
+			expect(pkg.devDependencies[name], name).toBe(spec);
+	});
+
+	it('reads imports of every form, by package, and adds only what the playground pins', () => {
+		expect(
+			importedPackages({
+				'deploy/a.ts': [
+					"import type {DiamondDeployOptions} from '@rocketh/diamond/types';",
+					"import {\n\tdeployViaRouter,\n} from '@rocketh/router';",
+					"export * from '@rocketh/web';",
+					"import 'side-effect';",
+					"const v = await import('viem/chains');",
+					'const r = require("@scope/pkg/sub");',
+					"import {x} from './local.js';",
+					"import {y} from '../rocketh/deploy.js';",
+					"import assert from 'node:assert';",
+				].join('\n'),
+				'contracts/A.sol': "import 'not-typescript/A.sol';",
+			}),
+		).toEqual([
+			'@rocketh/diamond',
+			'@rocketh/router',
+			'@rocketh/web',
+			'@scope/pkg',
+			'side-effect',
+			'viem',
+		]);
+		// a package the playground does not pin has no version to give: it is not added
+		const script =
+			"import pad from 'left-pad';\nimport {deployViaRouter} from '@rocketh/router';\n";
+		const pkg = JSON.parse(
+			unzip(zipProject({...startingProject(), 'deploy/02_more.ts': script}))[
+				'package.json'
+			],
+		) as PackageJson;
+		expect(pkg.devDependencies).not.toHaveProperty('left-pad');
+		expect(pkg.devDependencies['@rocketh/router']).toBe(
+			webSpecs['@rocketh/router'],
+		);
+	});
+
+	it('can add every package the runner resolves: each is pinned exactly by the playground', () => {
+		const packageOf = (s: string) =>
+			s
+				.split('/')
+				.slice(0, s.startsWith('@') ? 2 : 1)
+				.join('/');
+		for (const name of [...BARE_MODULE_NAMES, ...TYPE_ONLY_MODULES])
+			expect(PLAYGROUND_VERSIONS[packageOf(name)], name).toBeDefined();
 	});
 
 	it('refuses a workspace dependency no published version replaces', () => {

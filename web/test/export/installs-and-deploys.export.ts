@@ -8,7 +8,7 @@
  */
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync, rmSync} from 'node:fs';
+import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../../src/lib/playground/project/template.js';
 import {
 	COUNTER_TESTS,
+	PLAYGROUND_VERSIONS,
 	zipProject,
 	type ExportOptions,
 } from '../../src/lib/playground/project/export-project.js';
@@ -59,6 +60,30 @@ contract Counter {
 		'artifact: artifacts.Counter,\n\t\t\targs: [5n],',
 	);
 	expect(files['deploy/01_deploy_counter.ts']).toContain('args: [5n]');
+	return files;
+}
+
+/**
+ * The starting project with `@rocketh/router` and `@rocketh/diamond` spread into its config, which
+ * the template does not depend on, and Counter deployed through a router.
+ */
+function routedCounter(): ProjectFiles {
+	const files = startingProject();
+	files['rocketh/config.ts'] = files['rocketh/config.ts']
+		.replace(
+			"import * as viemExtension from '@rocketh/viem';",
+			"import * as viemExtension from '@rocketh/viem';\nimport * as routerExtension from '@rocketh/router';\nimport * as diamondExtension from '@rocketh/diamond';",
+		)
+		.replace(
+			'...viemExtension,',
+			'...viemExtension,\n\t...routerExtension,\n\t...diamondExtension,',
+		);
+	expect(files['rocketh/config.ts']).toContain('...diamondExtension,');
+	files['deploy/01_deploy_counter.ts'] =
+		"import {deployScript, artifacts} from '../rocketh/deploy.js';\n\n" +
+		'export default deployScript(\n\tasync ({deployViaRouter, namedAccounts}) => {\n' +
+		"\t\tawait deployViaRouter('Counter', {account: namedAccounts.deployer}, [{name: 'Counter', artifact: artifacts.Counter}]);\n\t},\n" +
+		"\t{tags: ['Counter']},\n);\n";
 	return files;
 }
 
@@ -122,6 +147,19 @@ describe('the exported project', () => {
 		for (const path of COUNTER_TESTS)
 			expect(exists(join(project, path)), path).toBe(false);
 		expect(exists(join(project, 'artifacts'))).toBe(true);
+	});
+
+	it('installs, compiles and deploys a project importing packages the template lacks', async () => {
+		const {project, outputs} = await exportAndDeploy(
+			'router-and-diamond',
+			routedCounter(),
+		);
+		const pkg = JSON.parse(
+			readFileSync(join(project, 'package.json'), 'utf8'),
+		) as {devDependencies: Record<string, string>};
+		for (const name of ['@rocketh/router', '@rocketh/diamond'])
+			expect(pkg.devDependencies[name], name).toBe(PLAYGROUND_VERSIONS[name]);
+		expect(outputs['pnpm hardhat deploy']).toContain('Counter_Router');
 	});
 
 	it('fails naming the step when the export is broken', async () => {

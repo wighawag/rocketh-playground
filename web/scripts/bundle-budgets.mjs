@@ -57,6 +57,7 @@ export const BUDGETS = {
 		'@rocketh/deploy': m(313778, 107668, '2026-11-20'),
 		'@rocketh/proxy': m(1373297, 289272, '2026-11-20'),
 		'@rocketh/diamond': m(1308821, 246724, '2026-11-20'),
+		'@rocketh/router': m(454246, 133056, '2026-11-21'),
 		'@rocketh/read-execute': m(153728, 47756, '2026-11-20'),
 		'@rocketh/viem': m(442611, 157405, '2026-11-20'),
 		'@rocketh/signer': m(383572, 141559, '2026-11-20'),
@@ -87,7 +88,9 @@ export const BUDGETS = {
 		'viem/utils': m(300892, 102546, '2026-11-20'),
 		'viem/zksync': m(498723, 159845, '2026-11-20'),
 	},
-	declarations: m(11906743, 1169639, '2026-11-20'),
+	// Raised on 2026-11-21 (from 11,906,743 / 1,169,639) for @rocketh/router: its types import
+	// solidity-proxy's artifact index, which brings every one of its artifacts as a literal type.
+	declarations: m(14658446, 1408184, '2026-11-21'),
 	soljson: m(9169169, 6520140, '2026-11-20'),
 };
 
