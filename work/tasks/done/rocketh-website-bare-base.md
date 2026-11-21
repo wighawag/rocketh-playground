@@ -40,3 +40,14 @@ Port the playground's change (task `project-link-bare-base`) by hand, since this
 > The repositories are public: no file, pull request or commit message names a funder, a grant, a milestone or a report; describe a change by what it does for a user. Never write em dashes; do not hard-wrap Markdown prose. Bound every shell command with `timeout`, stop any server you start, and never send a transaction.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your FINAL REPORT. When the task did not specify some behaviour and you had to choose, say what you chose and why. Do not write the done record, the commit message or the PR body yourself.
+
+## Delivered
+
+Built in wighawag/rocketh-website by https://github.com/wighawag/rocketh-website/pull/10 (squash-merged as `780deaf`, https://github.com/wighawag/rocketh-website/commit/780deaffb7a975fc5034e0856a14eb56332b4472). Every "Open in playground" link the site writes now carries `base: "bare"`, so an example opens on play.rocketh.dev without `contracts/Counter.sol` and `deploy/01_deploy_counter.ts`. It reaches rocketh.dev when rocketh's `.github/workflows/deploy.yml` pins `ROCKETH_WEBSITE_REF` at or after that commit (rocketh task `playground-examples-bare-base`).
+
+## Decisions
+
+- **The test decoder keeps the playground's signature (`bases: {starting, bare}`) and does not return `base`.** It is a copy of the playground's decoder, so it returns `{files, select}`. The tests show that `base: "bare"` was named by passing stand-in bases that differ: starting holds Counter stand-ins and bare is empty. The decoded files then equal exactly the example's files only for a bare link. The unit test also compares the link value with `encodeOverlay(..., {base: 'bare'})`.
+- **`NewerLinkError` was copied into the test decoder** so the tests can tell an unknown `base` or key (a newer link) apart from a corrupted one (a non-string `base`), as the playground does.
+- **`OVERLAY_BASES` and the `OverlayBase` and `OverlayOptions` typedefs are exported from the port**, as the playground exports them. Only `encodeOverlay` is used by the site.
+- **The README row also says "hand port"** instead of "copy", to match the playground's corrected wording. It still says "held to its two shared test vectors".
