@@ -35,3 +35,18 @@ This is generic on purpose: "Run this", "Open in playground", "Open in StackBlit
 > The repositories are public: no file, pull request or commit message names a funder, a grant, a milestone or a report; describe a change by what it does for a user. Never write em dashes; do not hard-wrap Markdown prose. Bound every shell command with `timeout`, stop any server you start, and never send a transaction.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your FINAL REPORT. When the task did not specify some behaviour and you had to choose, say what you chose and why. Do not write the done record, the commit message or the PR body yourself.
+
+## Delivered
+
+Built in wighawag/template-svelte-docs by https://github.com/wighawag/template-svelte-docs/pull/9 (squash-merged as `db25a20`).
+
+## Decisions
+
+- **What the function receives:** `lang` and `meta` are `null` when missing (not `undefined` or `''`). `source` is the code without its final line break, which is what Copy copies. `page` is `{source, route}`: the file relative to the content folder and its address, so a site can match on either.
+- **Links are checked like other links:** the link carries the code block's position and goes through the same link handling as the rest of the page. An internal `href` is rewritten relative to the page and fails the build if dead, with the block's line; an http(s) URL opens in a new tab like other external links.
+- **Bad return values fail the build too:** a return that isn't two non-empty strings (`label`, `href`) is treated like a throw. A silently missing button seemed worse than a build error.
+- **Same severity as dead links:** errors go into `DocsSite.check()`, so they fail `vite build` and are warnings under `vite dev`.
+- **Markup only changes when there is a link:** Copy and the link sit together in a new `div.code-actions` (link first, then Copy). Blocks without a link keep exactly today's markup, which is what keeps the "no option, same HTML" guarantee.
+- **Styled like Copy, hover behaviour included:** same border, size and colour; hidden until hover or focus, always visible on touch screens. A link that is always visible would overlap the language label in the corner.
+- **Sync only:** the task says "returns", so I didn't await the result.
+- **Docs:** the README has a table row plus a "Code block actions" section with an example. I also added a row to `docs/reference/configuration.md`, the site's own configuration page, so the two tables stay in step. I left `web/docs.config.js` unchanged so sites built from the template don't get merge conflicts there.
