@@ -3,6 +3,7 @@ title: 'Format the web sources with Prettier, and keep them formatted'
 slug: format-the-web-sources
 blockedBy: []
 covers: []
+needsAnswers: true
 ---
 
 ## What to build
