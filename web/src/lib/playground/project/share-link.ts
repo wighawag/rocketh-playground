@@ -11,6 +11,10 @@
  * A link carries at most `SHARE_FRAGMENT_LIMIT` (32 KB, the spec's Decision) of fragment, measured
  * as the fragment is written (`project=` and the value): above it, Share offers the zip instead.
  *
+ * A second encoding, `2.` (`overlay-link.ts`, what rocketh.dev's "Open in playground" buttons
+ * write), holds only files to lay over the starting project and the file to select; `decodeLink`
+ * reads either.
+ *
  * Decoding only reads data: the files go into the editor, and nothing in them runs until the
  * reader presses Deploy. A value that does not decode to a set of project files is refused whole.
  *
@@ -20,6 +24,7 @@
 import {deflateSync, inflateSync, strFromU8, strToU8} from 'fflate';
 import type {ProjectFiles} from './template.js';
 import {SHARE_FRAGMENT_LIMIT, SHARE_KEY} from './link-fragment.js';
+import {OVERLAY_VERSION, toBase64URL} from './overlay-link.js';
 
 export {SHARE_FRAGMENT_LIMIT, SHARE_KEY};
 
@@ -35,13 +40,6 @@ export class ShareLinkError extends Error {
 
 /** How long the fragment of a link holding `value` is: `project=` and the value. */
 export const fragmentLength = (value: string) => SHARE_KEY.length + 1 + value.length;
-
-function toBase64URL(bytes: Uint8Array): string {
-	let binary = '';
-	const CHUNK = 0x8000;
-	for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 function fromBase64URL(text: string): Uint8Array {
 	if (!/^[A-Za-z0-9_-]*$/.test(text) || text.length % 4 === 1) throw new ShareLinkError('it is not base64url');
@@ -83,29 +81,66 @@ function isProjectPath(path: string): boolean {
 	return segments[0] !== 'deployments';
 }
 
-/** The files a link's `project` value holds; throws a `ShareLinkError` saying why it cannot. */
-export function decodeProject(value: string): ProjectFiles {
-	if (!value.startsWith(VERSION)) throw new ShareLinkError('it is not a project link of this playground');
+const isObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The JSON a value holds after its version prefix: base64url, deflated. */
+function inflateJSON(payload: string): unknown {
 	let text: string;
 	try {
-		text = strFromU8(inflateSync(fromBase64URL(value.slice(VERSION.length))));
+		text = strFromU8(inflateSync(fromBase64URL(payload)));
 	} catch {
 		throw new ShareLinkError('it is corrupted or cut short');
 	}
-	let content: unknown;
 	try {
-		content = JSON.parse(text);
+		return JSON.parse(text);
 	} catch {
 		throw new ShareLinkError('it is corrupted or cut short');
 	}
-	if (typeof content !== 'object' || content === null || Array.isArray(content)) {
-		throw new ShareLinkError('it holds no project files');
-	}
+}
+
+/** `content` as project files, every path one a link may hold; `empty` says whether none is fine. */
+function projectFiles(content: unknown, empty: boolean): ProjectFiles {
+	if (!isObject(content)) throw new ShareLinkError('it holds no project files');
 	const entries = Object.entries(content);
-	if (entries.length === 0) throw new ShareLinkError('it holds no project files');
+	if (entries.length === 0 && !empty) throw new ShareLinkError('it holds no project files');
 	for (const [path, text] of entries) {
 		if (typeof text !== 'string') throw new ShareLinkError(`its file ${path} is not text`);
 		if (!isProjectPath(path)) throw new ShareLinkError(`it holds a file at ${JSON.stringify(path)}, which is not a project path`);
 	}
 	return Object.fromEntries(entries) as ProjectFiles;
+}
+
+/** The files a link's `1.` value holds; throws a `ShareLinkError` saying why it cannot. */
+export function decodeProject(value: string): ProjectFiles {
+	if (!value.startsWith(VERSION)) throw new ShareLinkError('it is not a project link of this playground');
+	return projectFiles(inflateJSON(value.slice(VERSION.length)), false);
+}
+
+/** What a link opens: the project's files, and the file to select (the first deploy script when none is named). */
+export type LinkedProject = {files: ProjectFiles; select?: string};
+
+/**
+ * What a `2.` value (`encodeOverlay`) opens: `base` (the starting project) with the value's files
+ * over it, and its `select`, which must name one of the resulting files. Throws a
+ * `ShareLinkError` saying why it cannot.
+ */
+export function decodeOverlay(value: string, base: ProjectFiles): LinkedProject {
+	if (!value.startsWith(OVERLAY_VERSION)) throw new ShareLinkError('it is not a project link of this playground');
+	const content = inflateJSON(value.slice(OVERLAY_VERSION.length));
+	if (!isObject(content) || !('files' in content)) throw new ShareLinkError('it holds no project files');
+	const unknown = Object.keys(content).filter((key) => key !== 'files' && key !== 'select');
+	if (unknown.length > 0) throw new ShareLinkError(`it holds ${unknown.map((k) => JSON.stringify(k)).join(', ')}, which this playground does not read`);
+	const files = {...base, ...projectFiles(content.files, true)};
+	const {select} = content;
+	if (select === undefined) return {files};
+	if (typeof select !== 'string' || !Object.hasOwn(files, select)) {
+		throw new ShareLinkError(`it selects ${JSON.stringify(select)}, which is not one of its files`);
+	}
+	return {files, select};
+}
+
+/** What a link's `project` value opens, in either encoding; `base` is what a `2.` value goes over. */
+export function decodeLink(value: string, base: ProjectFiles): LinkedProject {
+	return value.startsWith(OVERLAY_VERSION) ? decodeOverlay(value, base) : {files: decodeProject(value)};
 }

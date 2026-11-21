@@ -12,6 +12,10 @@
  * removed from the URL (`removeFromURL`, the page's `history.replaceState`), so a reload opens
  * the reader's files as they left them rather than the link again.
  *
+ * A link holds the whole project (`1.`) or files over the starting project and the file to select
+ * (`2.`, rocketh.dev's "Open in playground"); both open the same way, the second with that file
+ * selected (`decodeLink`).
+ *
  * The decoder (and fflate with it) is imported only when there is a link to open.
  */
 import {get, writable, type Readable} from 'svelte/store';
@@ -20,7 +24,7 @@ import {startingProject, type ProjectFiles} from './template.js';
 
 /** What opening a link needs of the session. */
 export type OpenableSession = Readable<{phase: Phase; files: ProjectFiles}> & {
-	open(files: ProjectFiles): Promise<void>;
+	open(files: ProjectFiles, selected?: string): Promise<void>;
 };
 
 export type LinkState =
@@ -49,7 +53,10 @@ export type LinkOpenerOptions = {
 	/** The fragment's `project` value, if the page was opened with one. */
 	value: string | undefined;
 	removeFromURL(): void;
-	/** What counts as no project of the reader's own (default: the starting project). */
+	/**
+	 * What counts as no project of the reader's own, and what a `2.` link's files go over
+	 * (default: the starting project).
+	 */
 	starting?: ProjectFiles;
 };
 
@@ -78,6 +85,8 @@ function settled(session: OpenableSession): Promise<Phase> {
 export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 	const store = writable<LinkState>({status: 'none'});
 	let files: ProjectFiles | undefined;
+	let selected: string | undefined;
+	const starting = options.starting ?? startingProject();
 	let removed = false;
 	const removeFromURL = () => {
 		if (removed) return;
@@ -87,7 +96,7 @@ export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 
 	async function open() {
 		store.set({status: 'opening'});
-		await options.session.open(files!);
+		await options.session.open(files!, selected);
 		const {phase, files: now} = get(options.session);
 		if (phase === 'ready' && now === files) {
 			removeFromURL();
@@ -100,8 +109,8 @@ export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 	async function begin() {
 		if (options.value === undefined) return;
 		try {
-			const {decodeProject} = await import('./share-link.js');
-			files = decodeProject(options.value);
+			const {decodeLink} = await import('./share-link.js');
+			({files, select: selected} = decodeLink(options.value, starting));
 		} catch (error) {
 			removeFromURL();
 			store.set({status: 'invalid', error: messageOf(error)});
@@ -112,7 +121,7 @@ export function createLinkOpener(options: LinkOpenerOptions): LinkOpener {
 			store.set({status: 'failed', error: 'the playground did not start'});
 			return;
 		}
-		if (sameFiles(get(options.session).files, options.starting ?? startingProject())) await open();
+		if (sameFiles(get(options.session).files, starting)) await open();
 		else store.set({status: 'confirm'});
 	}
 

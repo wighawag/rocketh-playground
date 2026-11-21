@@ -266,6 +266,12 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		expect(get(reloaded).files).toEqual(linked);
 		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
 		expect(lines(reloaded)).toContain('[script] the shared script ran');
+	
+		// a link may name the file to select; one it does not hold falls back to the first deploy script
+		await reloaded.open(linked, 'contracts/Counter.sol');
+		expect(get(reloaded)).toMatchObject({phase: 'ready', blockNumber: 0, selected: 'contracts/Counter.sol'});
+		await reloaded.open(linked, 'contracts/Missing.sol');
+		expect(get(reloaded)).toMatchObject({phase: 'ready', selected: DEPLOY});
 	});
 
 	it('refuses to reset while a run is in progress, changing nothing', async () => {

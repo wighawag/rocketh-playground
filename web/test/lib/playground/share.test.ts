@@ -11,6 +11,7 @@ import {createLinkOpener, type OpenableSession} from '../../../src/lib/playgroun
 import {withoutFragmentKey} from '../../../src/lib/playground/project/link-fragment.js';
 import {tooBigLabel} from '../../../src/lib/playground/project/share.js';
 import {encodeProject, decodeProject, SHARE_FRAGMENT_LIMIT} from '../../../src/lib/playground/project/share-link.js';
+import {encodeOverlay} from '../../../src/lib/playground/project/overlay-link.js';
 import {startingProject} from '../../../src/lib/playground/project/template.js';
 import type {Phase} from '../../../src/lib/playground/session.js';
 import type {ProjectFiles} from '../../../src/lib/playground/project/template.js';
@@ -74,15 +75,18 @@ describe('the fragment without the project', () => {
 function fakeSession(files: ProjectFiles, phase: Phase = 'booting') {
 	const store = writable({phase, files});
 	const opened: ProjectFiles[] = [];
-	const session: OpenableSession & {become(phase: Phase): void; opened: ProjectFiles[]} = {
+	const selected: (string | undefined)[] = [];
+	const session: OpenableSession & {become(phase: Phase): void; opened: ProjectFiles[]; selected: (string | undefined)[]} = {
 		subscribe: store.subscribe,
-		async open(next) {
+		async open(next, select) {
 			if (get(store).phase !== 'ready') return;
 			opened.push(next);
+			selected.push(select);
 			store.set({phase: 'ready', files: next});
 		},
 		become: (next) => store.update((s) => ({...s, phase: next})),
 		opened,
+		selected,
 	};
 	return session;
 }
@@ -156,6 +160,38 @@ describe('opening a link', () => {
 		expect(removed).toEqual([1]);
 		link.dismiss();
 		expect(get(link)).toEqual({status: 'none'});
+	});
+
+	it('opens a `2.` link as the starting project with its files over it, its file selected, then drops the key', async () => {
+		const session = fakeSession(startingProject());
+		const files = {'contracts/Greeter.sol': '// greeter\n', 'deploy/01_deploy_counter.ts': '// replaced\n'};
+		const {link, removed} = opener(session, encodeOverlay(files, 'contracts/Greeter.sol'));
+		const begun = link.begin();
+		session.become('ready');
+		await begun;
+		expect(session.opened).toEqual([{...startingProject(), ...files}]);
+		expect(session.selected).toEqual(['contracts/Greeter.sol']);
+		expect(get(link)).toEqual({status: 'none'});
+		expect(removed).toEqual([1]);
+	});
+
+	it("asks before a `2.` link replaces the reader's own project, as a `1.` link does", async () => {
+		const session = fakeSession({...startingProject(), 'deploy/02.ts': '// mine\n'}, 'ready');
+		const {link} = opener(session, encodeOverlay({'deploy/03.ts': '// linked\n'}));
+		await link.begin();
+		expect(get(link)).toEqual({status: 'confirm'});
+		await link.confirm();
+		expect(session.opened).toEqual([{...startingProject(), 'deploy/03.ts': '// linked\n'}]);
+		expect(session.selected).toEqual([undefined]);
+	});
+
+	it('reports a `2.` link selecting a file it does not hold, and opens nothing', async () => {
+		const session = fakeSession(startingProject(), 'ready');
+		const {link, removed} = opener(session, encodeOverlay({'deploy/03.ts': ''}, 'deploy/04.ts'));
+		await link.begin();
+		expect(get(link)).toEqual({status: 'invalid', error: 'it selects "deploy/04.ts", which is not one of its files'});
+		expect(session.opened).toEqual([]);
+		expect(removed).toEqual([1]);
 	});
 
 	it('keeps the key when the playground did not start, so a reload can open it', async () => {
