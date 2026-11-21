@@ -17,6 +17,9 @@ export function withoutFragmentKey(href: string, key: string): string {
 	const kept = href
 		.slice(hash + 1)
 		.split('&')
-		.filter((piece) => piece !== '' && decodeURIComponent(piece.split('=')[0]) !== key);
+		.filter(
+			(piece) =>
+				piece !== '' && decodeURIComponent(piece.split('=')[0]) !== key,
+		);
 	return href.slice(0, hash) + (kept.length > 0 ? `#${kept.join('&')}` : '');
 }

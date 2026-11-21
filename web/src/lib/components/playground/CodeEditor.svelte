@@ -1,5 +1,9 @@
 <script lang="ts">
-	import {createCodeEditor, type CodeEditor, type EditorLanguageService} from '$lib/playground/editor/code-editor';
+	import {
+		createCodeEditor,
+		type CodeEditor,
+		type EditorLanguageService,
+	} from '$lib/playground/editor/code-editor';
 
 	let {
 		path,
@@ -30,7 +34,11 @@
 </script>
 
 <!-- 16px on a phone: a smaller font makes iOS zoom the page when the editor is focused. -->
-<div bind:this={host} data-testid="editor" class="h-full min-h-0 text-base md:text-xs"></div>
+<div
+	bind:this={host}
+	data-testid="editor"
+	class="h-full min-h-0 text-base md:text-xs"
+></div>
 
 <style>
 	/*

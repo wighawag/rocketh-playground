@@ -94,8 +94,10 @@ describe('the environment', () => {
 			PNPM_HOME: '/home/runner/setup-pnpm/node_modules/.bin',
 		};
 		expect(
-			readerEnv(runner, '/home/runner/work/rocketh-playground/rocketh-playground')
-				.PATH,
+			readerEnv(
+				runner,
+				'/home/runner/work/rocketh-playground/rocketh-playground',
+			).PATH,
 		).toBe(
 			'/home/runner/setup-pnpm/node_modules/.bin:/opt/hostedtoolcache/node/24.0.0/x64/bin:/usr/bin',
 		);
@@ -103,7 +105,8 @@ describe('the environment', () => {
 
 	it('does not take a folder beside the repository for one inside it', () => {
 		expect(
-			readerEnv({PATH: '/repo-other/node_modules/.bin:/repo/bin'}, '/repo').PATH,
+			readerEnv({PATH: '/repo-other/node_modules/.bin:/repo/bin'}, '/repo')
+				.PATH,
 		).toBe('/repo-other/node_modules/.bin');
 	});
 

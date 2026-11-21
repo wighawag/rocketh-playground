@@ -18,7 +18,10 @@ import {SHARE_FRAGMENT_LIMIT} from './link-fragment';
 export const canShare = canDownload;
 
 /** Why a project gets no link, as the page says it. */
-export function tooBigLabel(length: number, limit = SHARE_FRAGMENT_LIMIT): string {
+export function tooBigLabel(
+	length: number,
+	limit = SHARE_FRAGMENT_LIMIT,
+): string {
 	const kb = (n: number) => `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} KB`;
 	return `This project is too big for a link: its link would carry ${kb(length)}, and a link carries at most ${kb(limit)}. Download it instead.`;
 }
@@ -74,11 +77,18 @@ export function createProjectShare(options: ShareOptions = {}): ProjectShare {
 			const link = shareURL(href(), shared.value);
 			store.set({status: 'shared', link, copied: await copy(link)});
 		} catch (error) {
-			store.set({status: 'failed', error: error instanceof Error ? error.message : String(error)});
+			store.set({
+				status: 'failed',
+				error: error instanceof Error ? error.message : String(error),
+			});
 		} finally {
 			building = false;
 		}
 	}
 
-	return {subscribe: store.subscribe, share, close: () => store.set({status: 'idle'})};
+	return {
+		subscribe: store.subscribe,
+		share,
+		close: () => store.set({status: 'idle'}),
+	};
 }

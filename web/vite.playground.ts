@@ -3,10 +3,16 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import ts from 'typescript';
 import {ensureSoljson} from './scripts/soljson.mjs';
 import {collectDeclarations} from './scripts/declarations.mjs';
-import {BARE_MODULE_NAMES, TYPE_ONLY_MODULES} from './src/lib/playground/runner/bare-modules.js';
+import {
+	BARE_MODULE_NAMES,
+	TYPE_ONLY_MODULES,
+} from './src/lib/playground/runner/bare-modules.js';
 import {projectCompilerOptions} from './src/lib/playground/typescript/project-options.js';
 
-const DECLARATIONS = new URL('./src/lib/playground/typescript/generated/declarations.json', import.meta.url);
+const DECLARATIONS = new URL(
+	'./src/lib/playground/typescript/generated/declarations.json',
+	import.meta.url,
+);
 
 /** The language service's declarations, written where the TypeScript worker imports them `?url`. */
 function writeDeclarations() {
@@ -15,7 +21,8 @@ function writeDeclarations() {
 		compilerOptions: projectCompilerOptions(ts),
 	});
 	const json = JSON.stringify({files, libs});
-	if (existsSync(DECLARATIONS) && readFileSync(DECLARATIONS, 'utf8') === json) return;
+	if (existsSync(DECLARATIONS) && readFileSync(DECLARATIONS, 'utf8') === json)
+		return;
 	mkdirSync(new URL('.', DECLARATIONS), {recursive: true});
 	writeFileSync(DECLARATIONS, json);
 }

@@ -34,7 +34,14 @@
  * the reason is no longer available rather than show the refusal, which reaches the copy as viem's
  * "Missing or invalid parameters" (webevm's -32000, its explanation left in the error's cause).
  */
-import {decodeAbiParameters, type Abi, type AbiParameter, type PublicClient, type Transaction, type TransactionReceipt} from 'viem';
+import {
+	decodeAbiParameters,
+	type Abi,
+	type AbiParameter,
+	type PublicClient,
+	type Transaction,
+	type TransactionReceipt,
+} from 'viem';
 import {
 	decodeTransaction,
 	formatDecodedError,
@@ -42,19 +49,27 @@ import {
 	type DecodedTransactionData,
 } from '../../../routes/explorer/lib/services/transactionDecoder.js';
 import {loadTransactionItemData} from '../../../routes/explorer/lib/services/transactionItem.js';
-import {decodeLogs, type DecodingContracts} from '../../../routes/explorer/lib/utils.js';
+import {
+	decodeLogs,
+	type DecodingContracts,
+} from '../../../routes/explorer/lib/utils.js';
 import {toPlainJson} from '../../core/utils/format/index.js';
 import {signingAccounts} from '../contracts/accounts.js';
 import type {DeployedContract} from '../contracts/records.js';
-
 
 export type Labelled = {address: `0x${string}`; label?: string};
 
 export type DecodedArg = {name: string; type: string; value: string};
 
-export type TransactionEvent = {address: `0x${string}`; contract?: string; name: string; args: DecodedArg[]};
+export type TransactionEvent = {
+	address: `0x${string}`;
+	contract?: string;
+	name: string;
+	args: DecodedArg[];
+};
 
-export type TransactionKind = 'deployment' | 'creation' | 'call' | 'undecoded' | 'transfer';
+export type TransactionKind =
+	'deployment' | 'creation' | 'call' | 'undecoded' | 'transfer';
 
 export type TransactionRow = {
 	hash: `0x${string}`;
@@ -84,7 +99,11 @@ export type TransactionRow = {
 };
 
 /** What a row is decoded from: the transaction, its receipt, and its block's timestamp. */
-export type RawTransaction = {tx: Transaction; receipt: TransactionReceipt | null; timestamp: number};
+export type RawTransaction = {
+	tx: Transaction;
+	receipt: TransactionReceipt | null;
+	timestamp: number;
+};
 
 export type DecodeContext = {
 	publicClient: PublicClient;
@@ -97,26 +116,51 @@ export type DecodeContext = {
 };
 
 /** The records as the copies want them: name to address and ABI. */
-export function decodingContracts(contracts: DeployedContract[]): DecodingContracts {
-	return Object.fromEntries(contracts.map((c) => [c.name, {address: c.address, abi: c.abi}]));
+export function decodingContracts(
+	contracts: DeployedContract[],
+): DecodingContracts {
+	return Object.fromEntries(
+		contracts.map((c) => [c.name, {address: c.address, abi: c.abi}]),
+	);
 }
 
-const same = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+const same = (a: string | null | undefined, b: string | null | undefined) =>
+	!!a && !!b && a.toLowerCase() === b.toLowerCase();
 
 /** A transaction seen for the first time: its receipt is read (the copy's `loadTransactionItemData`), then it is decoded. */
-export async function loadRow(tx: Transaction, timestamp: number, context: DecodeContext): Promise<{raw: RawTransaction; row: TransactionRow}> {
-	const {decodedData, receipt} = await loadTransactionItemData(tx, context.publicClient, decodingContracts(context.contracts));
+export async function loadRow(
+	tx: Transaction,
+	timestamp: number,
+	context: DecodeContext,
+): Promise<{raw: RawTransaction; row: TransactionRow}> {
+	const {decodedData, receipt} = await loadTransactionItemData(
+		tx,
+		context.publicClient,
+		decodingContracts(context.contracts),
+	);
 	const raw = {tx, receipt, timestamp};
 	return {raw, row: buildRow(raw, decodedData, context)};
 }
 
 /** A transaction already read, decoded again: after the records or the named accounts changed. */
-export async function decodeRow(raw: RawTransaction, context: DecodeContext): Promise<TransactionRow> {
-	const decoded = await decodeTransaction(raw.tx, raw.receipt, context.publicClient, decodingContracts(context.contracts));
+export async function decodeRow(
+	raw: RawTransaction,
+	context: DecodeContext,
+): Promise<TransactionRow> {
+	const decoded = await decodeTransaction(
+		raw.tx,
+		raw.receipt,
+		context.publicClient,
+		decodingContracts(context.contracts),
+	);
 	return buildRow(raw, decoded, context);
 }
 
-function buildRow(raw: RawTransaction, decoded: DecodedTransactionData, context: DecodeContext): TransactionRow {
+function buildRow(
+	raw: RawTransaction,
+	decoded: DecodedTransactionData,
+	context: DecodeContext,
+): TransactionRow {
 	const {tx, receipt, timestamp} = raw;
 	const {contracts} = context;
 	const accounts = signingAccounts(context.namedAccounts);
@@ -141,7 +185,11 @@ function buildRow(raw: RawTransaction, decoded: DecodedTransactionData, context:
 	};
 	if (receipt?.contractAddress) row.created = label(receipt.contractAddress);
 
-	const deployed = contracts.find((c) => same(c.transactionHash, tx.hash) || (!tx.to && same(c.address, receipt?.contractAddress)));
+	const deployed = contracts.find(
+		(c) =>
+			same(c.transactionHash, tx.hash) ||
+			(!tx.to && same(c.address, receipt?.contractAddress)),
+	);
 	if (deployed) {
 		row.kind = 'deployment';
 		row.title = `Deploy ${deployed.name}`;
@@ -170,22 +218,34 @@ function buildRow(raw: RawTransaction, decoded: DecodedTransactionData, context:
 				address: event.address,
 				contract: contract?.name,
 				name: event.eventName,
-				args: namedArgs(abiInputs(contract?.abi ?? [], 'event', event.eventName, event.args), event.args),
+				args: namedArgs(
+					abiInputs(contract?.abi ?? [], 'event', event.eventName, event.args),
+					event.args,
+				),
 			};
 		});
 		row.undecodedEvents = receipt.logs.length - events.length;
 	}
-	if (decoded.status === 'failed') row.revert = revertReason(decoded, row.blockNumber, context);
+	if (decoded.status === 'failed')
+		row.revert = revertReason(decoded, row.blockNumber, context);
 	return row;
 }
 
-function revertReason(decoded: DecodedTransactionData, block: number, {head, stateHistoryBlocks}: DecodeContext): string {
+function revertReason(
+	decoded: DecodedTransactionData,
+	block: number,
+	{head, stateHistoryBlocks}: DecodeContext,
+): string {
 	// webevm refuses the replay below its window (-32000, which viem reports as "Missing or
 	// invalid parameters", the copy's message then): say why instead
 	if (block < head - stateHistoryBlocks) {
 		return `the reason is no longer available: the chain keeps the state of its last ${stateHistoryBlocks} blocks, and this is block ${block} of ${head}`;
 	}
-	if (decoded.decodedError && decoded.decodedError.errorName !== 'Error' && decoded.decodedError.errorName !== 'Unknown') {
+	if (
+		decoded.decodedError &&
+		decoded.decodedError.errorName !== 'Error' &&
+		decoded.decodedError.errorName !== 'Unknown'
+	) {
 		return formatDecodedError(decoded.decodedError);
 	}
 	return decoded.error ?? 'reverted, with no reason given';
@@ -204,23 +264,50 @@ function constructorArgs(contract: DeployedContract): DecodedArg[] | undefined {
 }
 
 /** The inputs of the event a decoded name and its arguments came from (overloads by arity). */
-function abiInputs(abi: Abi, type: 'event', name: string, args: unknown): readonly AbiParameter[] {
-	const count = Array.isArray(args) ? args.length : args && typeof args === 'object' ? Object.keys(args).length : 0;
-	const items = abi.filter((item) => item.type === type && item.name === name) as {inputs: readonly AbiParameter[]}[];
-	return (items.find((item) => item.inputs.length === count) ?? items[0])?.inputs ?? [];
+function abiInputs(
+	abi: Abi,
+	type: 'event',
+	name: string,
+	args: unknown,
+): readonly AbiParameter[] {
+	const count = Array.isArray(args)
+		? args.length
+		: args && typeof args === 'object'
+			? Object.keys(args).length
+			: 0;
+	const items = abi.filter(
+		(item) => item.type === type && item.name === name,
+	) as {inputs: readonly AbiParameter[]}[];
+	return (
+		(items.find((item) => item.inputs.length === count) ?? items[0])?.inputs ??
+		[]
+	);
 }
 
 /** Each argument with its name and type; the copies give them positionally or by name. */
-function namedArgs(inputs: readonly AbiParameter[], args: unknown): DecodedArg[] {
+function namedArgs(
+	inputs: readonly AbiParameter[],
+	args: unknown,
+): DecodedArg[] {
 	if (args === undefined || args === null) return [];
 	if (Array.isArray(args)) {
-		return args.map((value, i) => ({name: inputs[i]?.name || `arg${i}`, type: inputs[i]?.type ?? '', value: formatArg(inputs[i]?.type ?? '', value)}));
+		return args.map((value, i) => ({
+			name: inputs[i]?.name || `arg${i}`,
+			type: inputs[i]?.type ?? '',
+			value: formatArg(inputs[i]?.type ?? '', value),
+		}));
 	}
 	if (typeof args === 'object') {
-		return Object.entries(args as Record<string, unknown>).map(([key, value], i) => {
-			const input = inputs.find((p) => p.name === key) ?? inputs[i];
-			return {name: key, type: input?.type ?? '', value: formatArg(input?.type ?? '', value)};
-		});
+		return Object.entries(args as Record<string, unknown>).map(
+			([key, value], i) => {
+				const input = inputs.find((p) => p.name === key) ?? inputs[i];
+				return {
+					name: key,
+					type: input?.type ?? '',
+					value: formatArg(input?.type ?? '', value),
+				};
+			},
+		);
 	}
 	return [{name: 'arg0', type: inputs[0]?.type ?? '', value: String(args)}];
 }
@@ -228,7 +315,8 @@ function namedArgs(inputs: readonly AbiParameter[], args: unknown): DecodedArg[]
 /** A value as text: a number as its digits, a string quoted, a tuple or an array as JSON. */
 function formatArg(type: string, value: unknown): string {
 	if (typeof value === 'string' && type !== 'string') return value;
-	if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+	if (typeof value === 'boolean' || typeof value === 'number')
+		return String(value);
 	return JSON.stringify(value);
 }
 

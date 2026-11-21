@@ -10,8 +10,18 @@ export type RunnerRequest =
 	 * database the records persist in; without one they live as long as the runner. `fresh` (the
 	 * playground's Reset) empties that store, saved copy included, before the runner is ready.
 	 */
-	| {type: 'init'; provider: MessagePort; deploymentsDB?: string; fresh?: boolean}
-	| {type: 'run'; id: number; modules: ProjectFiles; imports: Record<string, string[]>};
+	| {
+			type: 'init';
+			provider: MessagePort;
+			deploymentsDB?: string;
+			fresh?: boolean;
+	  }
+	| {
+			type: 'run';
+			id: number;
+			modules: ProjectFiles;
+			imports: Record<string, string[]>;
+	  };
 
 export type RunnerReply =
 	/** The deployment store as loaded, every file by path (`deployments/<environment>/...`). */

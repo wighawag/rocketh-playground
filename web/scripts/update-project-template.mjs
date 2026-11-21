@@ -8,22 +8,41 @@
 // the version and integrity are recorded in project-template.json beside the folder.
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {
+	cpSync,
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 const web = new URL('..', import.meta.url).pathname;
 const recordPath = join(web, 'project-template.json');
-const recorded = existsSync(recordPath) ? JSON.parse(readFileSync(recordPath, 'utf8')) : undefined;
+const recorded = existsSync(recordPath)
+	? JSON.parse(readFileSync(recordPath, 'utf8'))
+	: undefined;
 const version = process.argv[2] ?? recorded?.version;
-if (!version) throw new Error('usage: node scripts/update-project-template.mjs <hardhat-deploy version>');
+if (!version)
+	throw new Error(
+		'usage: node scripts/update-project-template.mjs <hardhat-deploy version>',
+	);
 
-const meta = await (await fetch(`https://registry.npmjs.org/hardhat-deploy/${version}`)).json();
+const meta = await (
+	await fetch(`https://registry.npmjs.org/hardhat-deploy/${version}`)
+).json();
 if (!meta.dist) throw new Error(`hardhat-deploy@${version} is not on npm`);
-const tarball = Buffer.from(await (await fetch(meta.dist.tarball)).arrayBuffer());
+const tarball = Buffer.from(
+	await (await fetch(meta.dist.tarball)).arrayBuffer(),
+);
 const [algorithm, digest] = meta.dist.integrity.split('-');
 const actual = createHash(algorithm).update(tarball).digest('base64');
-if (actual !== digest) throw new Error(`hardhat-deploy@${version}: integrity ${actual}, the registry says ${digest}`);
+if (actual !== digest)
+	throw new Error(
+		`hardhat-deploy@${version}: integrity ${actual}, the registry says ${digest}`,
+	);
 
 const work = mkdtempSync(join(tmpdir(), 'hardhat-deploy-'));
 try {
@@ -34,5 +53,14 @@ try {
 } finally {
 	rmSync(work, {recursive: true, force: true});
 }
-writeFileSync(recordPath, JSON.stringify({package: 'hardhat-deploy', version, integrity: meta.dist.integrity}, null, '\t') + '\n');
-console.log(`project-template/ is hardhat-deploy@${version} templates/basic (${meta.dist.integrity})`);
+writeFileSync(
+	recordPath,
+	JSON.stringify(
+		{package: 'hardhat-deploy', version, integrity: meta.dist.integrity},
+		null,
+		'\t',
+	) + '\n',
+);
+console.log(
+	`project-template/ is hardhat-deploy@${version} templates/basic (${meta.dist.integrity})`,
+);

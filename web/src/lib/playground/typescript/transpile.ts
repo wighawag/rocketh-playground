@@ -25,7 +25,10 @@ export type TranspileResult = {
 	ok: boolean;
 };
 
-export function transpileProject(ts: typeof tsModule, files: ProjectFiles): TranspileResult {
+export function transpileProject(
+	ts: typeof tsModule,
+	files: ProjectFiles,
+): TranspileResult {
 	const compilerOptions: tsModule.CompilerOptions = {
 		module: ts.ModuleKind.CommonJS,
 		target: ts.ScriptTarget.ES2022,
@@ -36,20 +39,35 @@ export function transpileProject(ts: typeof tsModule, files: ProjectFiles): Tran
 	const diagnostics: Diagnostic[] = [];
 	for (const [file, text] of Object.entries(files)) {
 		if (!/\.[cm]?[jt]s$/.test(file)) continue;
-		const result = ts.transpileModule(text, {fileName: file, compilerOptions, reportDiagnostics: true});
+		const result = ts.transpileModule(text, {
+			fileName: file,
+			compilerOptions,
+			reportDiagnostics: true,
+		});
 		for (const d of result.diagnostics ?? []) {
-			const at = d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : {line: 0, character: 0};
+			const at =
+				d.file && d.start !== undefined
+					? d.file.getLineAndCharacterOfPosition(d.start)
+					: {line: 0, character: 0};
 			diagnostics.push({
 				file,
 				line: at.line + 1,
 				column: at.character + 1,
 				message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
-				severity: d.category === ts.DiagnosticCategory.Error ? 'error' : 'warning',
+				severity:
+					d.category === ts.DiagnosticCategory.Error ? 'error' : 'warning',
 				source: 'typescript',
 			});
 		}
 		modules[file] = result.outputText;
-		imports[file] = ts.preProcessFile(result.outputText, true, true).importedFiles.map((f) => f.fileName);
+		imports[file] = ts
+			.preProcessFile(result.outputText, true, true)
+			.importedFiles.map((f) => f.fileName);
 	}
-	return {modules, imports, diagnostics, ok: !diagnostics.some((d) => d.severity === 'error')};
+	return {
+		modules,
+		imports,
+		diagnostics,
+		ok: !diagnostics.some((d) => d.severity === 'error'),
+	};
 }

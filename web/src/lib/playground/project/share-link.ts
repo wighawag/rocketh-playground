@@ -48,17 +48,24 @@ export class ShareLinkError extends Error {
 /** A `2.` link this playground cannot read because it was written for a newer one. */
 export class NewerLinkError extends ShareLinkError {
 	constructor() {
-		super('it needs a newer version of the playground than this one; reload the page to open it');
+		super(
+			'it needs a newer version of the playground than this one; reload the page to open it',
+		);
 		this.name = 'NewerLinkError';
 	}
 }
 
 /** How long the fragment of a link holding `value` is: `project=` and the value. */
-export const fragmentLength = (value: string) => SHARE_KEY.length + 1 + value.length;
+export const fragmentLength = (value: string) =>
+	SHARE_KEY.length + 1 + value.length;
 
 function fromBase64URL(text: string): Uint8Array {
-	if (!/^[A-Za-z0-9_-]*$/.test(text) || text.length % 4 === 1) throw new ShareLinkError('it is not base64url');
-	const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4));
+	if (!/^[A-Za-z0-9_-]*$/.test(text) || text.length % 4 === 1)
+		throw new ShareLinkError('it is not base64url');
+	const binary = atob(
+		text.replace(/-/g, '+').replace(/_/g, '/') +
+			'='.repeat((4 - (text.length % 4)) % 4),
+	);
 	const bytes = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 	return bytes;
@@ -66,16 +73,22 @@ function fromBase64URL(text: string): Uint8Array {
 
 /** The value of the fragment's `project` key for `files`, whatever its length. */
 export function encodeProject(files: ProjectFiles): string {
-	return VERSION + toBase64URL(deflateSync(strToU8(JSON.stringify(files)), {level: 9}));
+	return (
+		VERSION +
+		toBase64URL(deflateSync(strToU8(JSON.stringify(files)), {level: 9}))
+	);
 }
 
-export type SharedProject = {ok: true; value: string} | {ok: false; length: number};
+export type SharedProject =
+	{ok: true; value: string} | {ok: false; length: number};
 
 /** The `project` value for `files`, or how long its fragment would be when that is over the cap. */
 export function shareProject(files: ProjectFiles): SharedProject {
 	const value = encodeProject(files);
 	const length = fragmentLength(value);
-	return length <= SHARE_FRAGMENT_LIMIT ? {ok: true, value} : {ok: false, length};
+	return length <= SHARE_FRAGMENT_LIMIT
+		? {ok: true, value}
+		: {ok: false, length};
 }
 
 /** The link to `value` from the page at `href`: the page's URL with its fragment replaced. */
@@ -118,17 +131,23 @@ function inflateJSON(payload: string): unknown {
 function projectFiles(content: unknown, empty: boolean): ProjectFiles {
 	if (!isObject(content)) throw new ShareLinkError('it holds no project files');
 	const entries = Object.entries(content);
-	if (entries.length === 0 && !empty) throw new ShareLinkError('it holds no project files');
+	if (entries.length === 0 && !empty)
+		throw new ShareLinkError('it holds no project files');
 	for (const [path, text] of entries) {
-		if (typeof text !== 'string') throw new ShareLinkError(`its file ${path} is not text`);
-		if (!isProjectPath(path)) throw new ShareLinkError(`it holds a file at ${JSON.stringify(path)}, which is not a project path`);
+		if (typeof text !== 'string')
+			throw new ShareLinkError(`its file ${path} is not text`);
+		if (!isProjectPath(path))
+			throw new ShareLinkError(
+				`it holds a file at ${JSON.stringify(path)}, which is not a project path`,
+			);
 	}
 	return Object.fromEntries(entries) as ProjectFiles;
 }
 
 /** The files a link's `1.` value holds; throws a `ShareLinkError` saying why it cannot. */
 export function decodeProject(value: string): ProjectFiles {
-	if (!value.startsWith(VERSION)) throw new ShareLinkError('it is not a project link of this playground');
+	if (!value.startsWith(VERSION))
+		throw new ShareLinkError('it is not a project link of this playground');
 	return projectFiles(inflateJSON(value.slice(VERSION.length)), false);
 }
 
@@ -148,24 +167,38 @@ const OVERLAY_KEYS = ['base', 'files', 'select'];
  * or a `base` this playground does not know.
  */
 export function decodeOverlay(value: string, bases: LinkBases): LinkedProject {
-	if (!value.startsWith(OVERLAY_VERSION)) throw new ShareLinkError('it is not a project link of this playground');
+	if (!value.startsWith(OVERLAY_VERSION))
+		throw new ShareLinkError('it is not a project link of this playground');
 	const content = inflateJSON(value.slice(OVERLAY_VERSION.length));
-	if (!isObject(content) || !('files' in content)) throw new ShareLinkError('it holds no project files');
+	if (!isObject(content) || !('files' in content))
+		throw new ShareLinkError('it holds no project files');
 	const {base: name} = content;
-	if (name !== undefined && typeof name !== 'string') throw new ShareLinkError(`its base is ${JSON.stringify(name)}, which is not a base's name`);
-	if (Object.keys(content).some((key) => !OVERLAY_KEYS.includes(key))) throw new NewerLinkError();
-	if (name !== undefined && !(OVERLAY_BASES as readonly string[]).includes(name)) throw new NewerLinkError();
+	if (name !== undefined && typeof name !== 'string')
+		throw new ShareLinkError(
+			`its base is ${JSON.stringify(name)}, which is not a base's name`,
+		);
+	if (Object.keys(content).some((key) => !OVERLAY_KEYS.includes(key)))
+		throw new NewerLinkError();
+	if (
+		name !== undefined &&
+		!(OVERLAY_BASES as readonly string[]).includes(name)
+	)
+		throw new NewerLinkError();
 	const base = name === 'bare' ? bases.bare : bases.starting;
 	const files = {...base, ...projectFiles(content.files, true)};
 	const {select} = content;
 	if (select === undefined) return {files};
 	if (typeof select !== 'string' || !Object.hasOwn(files, select)) {
-		throw new ShareLinkError(`it selects ${JSON.stringify(select)}, which is not one of its files`);
+		throw new ShareLinkError(
+			`it selects ${JSON.stringify(select)}, which is not one of its files`,
+		);
 	}
 	return {files, select};
 }
 
 /** What a link's `project` value opens, in either encoding; `bases` are what a `2.` value goes over. */
 export function decodeLink(value: string, bases: LinkBases): LinkedProject {
-	return value.startsWith(OVERLAY_VERSION) ? decodeOverlay(value, bases) : {files: decodeProject(value)};
+	return value.startsWith(OVERLAY_VERSION)
+		? decodeOverlay(value, bases)
+		: {files: decodeProject(value)};
 }

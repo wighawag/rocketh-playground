@@ -16,7 +16,10 @@ import type {RunnerReply, RunnerRequest} from './protocol.js';
 
 type Scope = {
 	postMessage(message: unknown): void;
-	addEventListener(type: 'message', listener: (event: {data: unknown}) => void): void;
+	addEventListener(
+		type: 'message',
+		listener: (event: {data: unknown}) => void,
+	): void;
 	start?: () => void;
 };
 
@@ -34,7 +37,9 @@ export function serveRunner(scope: Scope): void {
 
 	async function init(request: Extract<RunnerRequest, {type: 'init'}>) {
 		const web = await BARE_MODULES['@rocketh/web']();
-		provider = providerOverPort(request.provider as unknown as PortLike) as unknown as RequestProvider;
+		provider = providerOverPort(
+			request.provider as unknown as PortLike,
+		) as unknown as RequestProvider;
 		store = request.deploymentsDB
 			? await web.createIndexedDBDeploymentStore({db: request.deploymentsDB})
 			: web.createVFSDeploymentStore();
@@ -44,8 +49,15 @@ export function serveRunner(scope: Scope): void {
 			await vfs.flush?.();
 		}
 		vfs.subscribe((change) => {
-			if (change.type === 'write') post({type: 'store', change: 'write', path: change.path, content: vfs.read(change.path)});
-			else if (change.type === 'restore') post({type: 'store', change: 'restore', files: vfs.snapshot()});
+			if (change.type === 'write')
+				post({
+					type: 'store',
+					change: 'write',
+					path: change.path,
+					content: vfs.read(change.path),
+				});
+			else if (change.type === 'restore')
+				post({type: 'store', change: 'restore', files: vfs.snapshot()});
 			else post({type: 'store', change: change.type, path: change.path});
 		});
 		post({type: 'ready', files: vfs.snapshot()});
@@ -55,7 +67,10 @@ export function serveRunner(scope: Scope): void {
 		const request = event.data as RunnerRequest;
 		if (request.type === 'init') {
 			init(request).catch((error: unknown) =>
-				post({type: 'init-failed', message: error instanceof Error ? error.message : String(error)}),
+				post({
+					type: 'init-failed',
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 			return;
 		}
@@ -65,7 +80,13 @@ export function serveRunner(scope: Scope): void {
 					post({
 						type: 'done',
 						id: request.id,
-						outcome: {ok: false, error: {name: 'Error', message: 'the runner was not initialised'}, deployments: {}, requests: {}, ms: 0},
+						outcome: {
+							ok: false,
+							error: {name: 'Error', message: 'the runner was not initialised'},
+							deployments: {},
+							requests: {},
+							ms: 0,
+						},
 					});
 					return;
 				}

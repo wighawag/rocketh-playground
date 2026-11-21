@@ -14,7 +14,8 @@
 	- smaller ones: `min-w-0` and `break-all` so a long signature wraps on a phone; a result is
 	  shown and counted when it is `!== null` (so a `0n` read counts, where the original tested
 	  truthiness); Clear also clears an error alone; an error is summarised by
-	  `callErrorMessage` (the revert reason) rather than shown as `e.message`, and not logged.
+	  `callErrorMessage` (the revert reason) rather than shown as `e.message`, and not logged;
+	- formatted with this repository's Prettier setup (web/.prettierrc).
 -->
 <script lang="ts">
 	import type {AbiFunction} from 'viem';
@@ -62,7 +63,9 @@
 	});
 
 	let isView = $derived(isViewFunction(abiItem.stateMutability));
-	let idPrefix = $derived(`${contract.address}-${getFunctionSignature(abiItem)}-`);
+	let idPrefix = $derived(
+		`${contract.address}-${getFunctionSignature(abiItem)}-`,
+	);
 </script>
 
 <Card.Root class="border-2" data-testid="function" data-function={functionName}>
@@ -139,7 +142,8 @@
 					<span class="font-medium"
 						>{$call.transaction.status === 'success'
 							? 'Transaction mined'
-							: 'Transaction mined, and reverted'} in block {$call.transaction.blockNumber}</span
+							: 'Transaction mined, and reverted'} in block {$call.transaction
+							.blockNumber}</span
 					>
 					<TransactionHash
 						value={$call.transaction.hash}
@@ -149,7 +153,8 @@
 						data-testid="tx-hash"
 					/>
 					<span class="text-xs text-muted-foreground"
-						>from {$call.transaction.fromLabel}, gas used {$call.transaction.gasUsed}</span
+						>from {$call.transaction.fromLabel}, gas used {$call.transaction
+							.gasUsed}</span
 					>
 				</Alert.Description>
 			</Alert.Root>
@@ -190,7 +195,11 @@
 		{/if}
 
 		{#if $call.result !== null || $call.transaction !== null || $call.error !== null}
-			<Button onclick={() => call.clear()} variant="ghost" disabled={$call.loading}>
+			<Button
+				onclick={() => call.clear()}
+				variant="ghost"
+				disabled={$call.loading}
+			>
 				Clear
 			</Button>
 		{/if}

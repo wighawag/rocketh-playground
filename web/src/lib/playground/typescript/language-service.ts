@@ -15,8 +15,15 @@
  * `typescript` is a parameter, as for the transpiler, so the node tests drive the same service.
  */
 import type tsModule from 'typescript';
-import {createSystem, createVirtualTypeScriptEnvironment} from '@typescript/vfs';
-import {getAutocompletion, getHover, getLints} from '@valtown/codemirror-ts/worker';
+import {
+	createSystem,
+	createVirtualTypeScriptEnvironment,
+} from '@typescript/vfs';
+import {
+	getAutocompletion,
+	getHover,
+	getLints,
+} from '@valtown/codemirror-ts/worker';
 import type {Diagnostic} from '../diagnostic.js';
 import type {ProjectFiles} from '../project/template.js';
 import {projectCompilerOptions, type Declarations} from './project-options.js';
@@ -28,10 +35,16 @@ const ARTIFACTS = 'generated/artifacts/';
 
 export type LanguageService = ReturnType<typeof createLanguageService>;
 
-export function createLanguageService(ts: typeof tsModule, declarations: Declarations, files: ProjectFiles = {}) {
+export function createLanguageService(
+	ts: typeof tsModule,
+	declarations: Declarations,
+	files: ProjectFiles = {},
+) {
 	const fsMap = new Map<string, string>();
-	for (const [path, text] of Object.entries(declarations.libs)) fsMap.set(path, text);
-	for (const [path, text] of Object.entries(declarations.files)) fsMap.set(path, text);
+	for (const [path, text] of Object.entries(declarations.libs))
+		fsMap.set(path, text);
+	for (const [path, text] of Object.entries(declarations.files))
+		fsMap.set(path, text);
 	fsMap.set('/package.json', JSON.stringify({type: 'module'}));
 	const typed = Object.entries(files).filter(([path]) => isTyped(path));
 	for (const [path, text] of typed) fsMap.set(vfsPath(path), text);
@@ -42,7 +55,9 @@ export function createLanguageService(ts: typeof tsModule, declarations: Declara
 		projectCompilerOptions(ts),
 	);
 	/** The artifact declarations the service holds now, to drop the ones a compile no longer makes. */
-	let artifactTypes = new Set(typed.map(([path]) => path).filter((path) => path.startsWith(ARTIFACTS)));
+	let artifactTypes = new Set(
+		typed.map(([path]) => path).filter((path) => path.startsWith(ARTIFACTS)),
+	);
 
 	function setFile(path: string, text: string) {
 		if (!isTyped(path)) return;
@@ -61,7 +76,8 @@ export function createLanguageService(ts: typeof tsModule, declarations: Declara
 		deleteFile,
 		/** Every typed file of the project, as the session holds them now. */
 		setFiles(projectFiles: ProjectFiles) {
-			for (const [path, text] of Object.entries(projectFiles)) setFile(path, text);
+			for (const [path, text] of Object.entries(projectFiles))
+				setFile(path, text);
 		},
 		/** The `generated/artifacts/*.d.ts` of a compile (`../compiler/solidity.ts`), replacing the last. */
 		setArtifactTypes(types: ProjectFiles) {
@@ -73,15 +89,22 @@ export function createLanguageService(ts: typeof tsModule, declarations: Declara
 		diagnostics(path: string): Diagnostic[] {
 			const at = vfsPath(path);
 			if (!env.getSourceFile(at)) return [];
-			const found = [...env.languageService.getSyntacticDiagnostics(at), ...env.languageService.getSemanticDiagnostics(at)];
+			const found = [
+				...env.languageService.getSyntacticDiagnostics(at),
+				...env.languageService.getSemanticDiagnostics(at),
+			];
 			return found.map((d) => {
-				const position = d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : {line: 0, character: 0};
+				const position =
+					d.file && d.start !== undefined
+						? d.file.getLineAndCharacterOfPosition(d.start)
+						: {line: 0, character: 0};
 				return {
 					file: path,
 					line: position.line + 1,
 					column: position.character + 1,
 					message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
-					severity: d.category === ts.DiagnosticCategory.Error ? 'error' : 'warning',
+					severity:
+						d.category === ts.DiagnosticCategory.Error ? 'error' : 'warning',
 					source: 'typescript',
 				};
 			});
@@ -91,10 +114,22 @@ export function createLanguageService(ts: typeof tsModule, declarations: Declara
 		updateFile({path, code}: {path: string; code: string}) {
 			setFile(path.slice(1), code);
 		},
-		getLints({path, diagnosticCodesToIgnore}: {path: string; diagnosticCodesToIgnore: number[]}) {
+		getLints({
+			path,
+			diagnosticCodesToIgnore,
+		}: {
+			path: string;
+			diagnosticCodesToIgnore: number[];
+		}) {
 			return getLints({env, path, diagnosticCodesToIgnore});
 		},
-		getAutocompletion({path, context}: {path: string; context: {pos: number; explicit: boolean}}) {
+		getAutocompletion({
+			path,
+			context,
+		}: {
+			path: string;
+			context: {pos: number; explicit: boolean};
+		}) {
 			return getAutocompletion({env, path, context});
 		},
 		getHover({path, pos}: {path: string; pos: number}) {

@@ -45,12 +45,20 @@ import {formatDiagnostic, type Diagnostic} from './diagnostic.js';
 import {phaseLabel} from './format.js';
 import {startingProject, type ProjectFiles} from './project/template.js';
 import {openSavedProject, type SavedProject} from './project/saved-project.js';
-import {MIGRATION_GUIDE_LABEL, MIGRATION_GUIDE_URL, V1_SCRIPT_HINT, looksLikeV1Script} from './migration.js';
+import {
+	MIGRATION_GUIDE_LABEL,
+	MIGRATION_GUIDE_URL,
+	V1_SCRIPT_HINT,
+	looksLikeV1Script,
+} from './migration.js';
 
 /** What the session needs of a worker: a `Worker`, or a MessagePort with a `terminate` in tests. */
 export type WorkerLike = {
 	postMessage(message: unknown, transfer?: Transferable[]): void;
-	addEventListener(type: 'message' | 'error', listener: (event: MessageEvent & ErrorEvent) => void): void;
+	addEventListener(
+		type: 'message' | 'error',
+		listener: (event: MessageEvent & ErrorEvent) => void,
+	): void;
 	terminate(): void;
 };
 
@@ -108,12 +116,20 @@ export type Phase =
 	| 'failed';
 
 /** What the session's chain offers the Contracts view: an EIP-1193-style `request`. */
-export type ChainProvider = {request(args: {method: string; params?: unknown}): Promise<unknown>};
+export type ChainProvider = {
+	request(args: {method: string; params?: unknown}): Promise<unknown>;
+};
 
 /** A page the transcript points to after its text, opened in a new tab. */
 export type TranscriptLink = {href: string; label: string};
 
-export type TranscriptLine = {seq: number; source: LogSource; text: string; at: number; link?: TranscriptLink};
+export type TranscriptLine = {
+	seq: number;
+	source: LogSource;
+	text: string;
+	at: number;
+	link?: TranscriptLink;
+};
 
 export type LastRun = {
 	outcome: 'deployed' | 'failed' | 'stopped';
@@ -126,7 +142,12 @@ export type LastRun = {
 export type PlaygroundState = {
 	phase: Phase;
 	error?: string;
-	compiler: {status: 'loading' | 'ready' | 'failed'; loaded: number; total: number; error?: string};
+	compiler: {
+		status: 'loading' | 'ready' | 'failed';
+		loaded: number;
+		total: number;
+		error?: string;
+	};
 	typescriptVersion?: string;
 	languageService: LanguageServiceState;
 	/**
@@ -183,12 +204,17 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 /** Long transcripts keep their tail: a reader scrolls back a few runs, not a thousand. */
 const TRANSCRIPT_LIMIT = 2000;
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const messageOf = (error: unknown) =>
+	error instanceof Error ? error.message : String(error);
 
 /** What a project opens on: its first deploy script. */
-const firstSelected = (files: ProjectFiles) => Object.keys(files).find((p) => p.startsWith('deploy/')) ?? Object.keys(files)[0];
+const firstSelected = (files: ProjectFiles) =>
+	Object.keys(files).find((p) => p.startsWith('deploy/')) ??
+	Object.keys(files)[0];
 
-export function createPlaygroundSession(options: SessionOptions): PlaygroundSession {
+export function createPlaygroundSession(
+	options: SessionOptions,
+): PlaygroundSession {
 	const files = options.files ?? startingProject();
 	let state: PlaygroundState = {
 		phase: 'idle',
@@ -202,21 +228,36 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		diagnostics: [],
 	};
 	const store = writable(state);
-	const set = (patch: Partial<PlaygroundState> | ((s: PlaygroundState) => Partial<PlaygroundState>)) => {
+	const set = (
+		patch:
+			| Partial<PlaygroundState>
+			| ((s: PlaygroundState) => Partial<PlaygroundState>),
+	) => {
 		state = {...state, ...(typeof patch === 'function' ? patch(state) : patch)};
 		store.set(state);
 	};
 
 	let seq = 0;
 	function say(source: LogSource, text: string, link?: TranscriptLink) {
-		const line: TranscriptLine = {seq: seq++, source, text, at: Date.now(), ...(link ? {link} : {})};
-		set((s) => ({transcript: [...s.transcript, line].slice(-TRANSCRIPT_LIMIT)}));
+		const line: TranscriptLine = {
+			seq: seq++,
+			source,
+			text,
+			at: Date.now(),
+			...(link ? {link} : {}),
+		};
+		set((s) => ({
+			transcript: [...s.transcript, line].slice(-TRANSCRIPT_LIMIT),
+		}));
 	}
 
 	// --- compiler ---------------------------------------------------------------------------------
 	let compilerWorker: WorkerLike | undefined;
 	let compileId = 0;
-	const compiles = new Map<number, {resolve: (r: CompileResult) => void; reject: (e: Error) => void}>();
+	const compiles = new Map<
+		number,
+		{resolve: (r: CompileResult) => void; reject: (e: Error) => void}
+	>();
 	let compilerLoaded: Promise<void> | undefined;
 
 	function startCompiler() {
@@ -233,14 +274,18 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			if (reply.type === 'progress') {
 				set((s) => ({compiler: {...s.compiler, loaded: reply.loaded}}));
 			} else if (reply.type === 'loaded') {
-				set((s) => ({compiler: {...s.compiler, status: 'ready', loaded: s.compiler.total}}));
+				set((s) => ({
+					compiler: {...s.compiler, status: 'ready', loaded: s.compiler.total},
+				}));
 				markLoaded();
 			} else if (reply.type === 'compiled') {
 				compiles.get(reply.id)?.resolve(reply.result);
 				compiles.delete(reply.id);
 			} else if (reply.type === 'failed') {
 				if (reply.id === undefined) {
-					set((s) => ({compiler: {...s.compiler, status: 'failed', error: reply.message}}));
+					set((s) => ({
+						compiler: {...s.compiler, status: 'failed', error: reply.message},
+					}));
 					markFailed(new Error(reply.message));
 				} else {
 					compiles.get(reply.id)?.reject(new Error(reply.message));
@@ -248,7 +293,10 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 				}
 			}
 		});
-		const load: CompilerRequest = {type: 'load', soljsonURL: options.soljsonURL};
+		const load: CompilerRequest = {
+			type: 'load',
+			soljsonURL: options.soljsonURL,
+		};
 		compilerWorker.postMessage(load);
 	}
 
@@ -256,7 +304,11 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		const id = ++compileId;
 		return new Promise((resolve, reject) => {
 			compiles.set(id, {resolve, reject});
-			const request: CompilerRequest = {type: 'compile', id, files: projectFiles};
+			const request: CompilerRequest = {
+				type: 'compile',
+				id,
+				files: projectFiles,
+			};
 			compilerWorker!.postMessage(request);
 		});
 	}
@@ -276,7 +328,9 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			chainId: CHAIN_ID,
 			// so the Transactions view can replay an older transaction to find a revert's reason
 			stateHistory: {blocks: STATE_HISTORY_BLOCKS},
-			initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
+			initialBalances: Object.fromEntries(
+				TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE]),
+			),
 			...(options.chainDB ? {indexedDB: options.chainDB} : {}),
 			...(fresh ? {fresh} : {}),
 		};
@@ -291,15 +345,25 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		set({languageService: {status: 'loading'}});
 		try {
 			const startedWith = state.files;
-			const started = await typescript!.startLanguageService({...startedWith, ...artifactTypes});
+			const started = await typescript!.startLanguageService({
+				...startedWith,
+				...artifactTypes,
+			});
 			// What changed while it loaded: edits (which were not forwarded), a Reset (which drops the
 			// files the reader added) and a compile's types.
-			const gone = Object.keys(startedWith).filter((path) => !(path in state.files));
+			const gone = Object.keys(startedWith).filter(
+				(path) => !(path in state.files),
+			);
 			if (gone.length > 0) await typescript!.removeFiles(gone);
 			await typescript!.setFiles(state.files);
 			if (artifactTypes) await typescript!.setArtifactTypes(artifactTypes);
 			set((s) => ({
-				languageService: {status: 'ready', readyMs: performance.now() - startedAt, loadMs: started.loadMs, createMs: started.createMs},
+				languageService: {
+					status: 'ready',
+					readyMs: performance.now() - startedAt,
+					loadMs: started.loadMs,
+					createMs: started.createMs,
+				},
 				artifactTypes: s.artifactTypes + (artifactTypes ? 1 : 0),
 			}));
 		} catch (error) {
@@ -345,7 +409,11 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	async function refreshBlockNumber() {
 		if (!node) return;
-		set({blockNumber: Number(await node.request({method: 'eth_blockNumber'} as never))});
+		set({
+			blockNumber: Number(
+				await node.request({method: 'eth_blockNumber'} as never),
+			),
+		});
 	}
 
 	// --- runner -----------------------------------------------------------------------------------
@@ -364,7 +432,9 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		const served = await node!.serveOn(channel.port1);
 		const current: Runner = {worker, served};
 		const ready = new Promise<void>((resolve, reject) => {
-			worker.addEventListener('error', (event) => reject(new Error(`the runner worker failed: ${event.message}`)));
+			worker.addEventListener('error', (event) =>
+				reject(new Error(`the runner worker failed: ${event.message}`)),
+			);
 			worker.addEventListener('message', (event) => {
 				// A runner that was stopped has no say any more (`runner` is set before any reply).
 				if (runner !== current) return;
@@ -383,9 +453,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 					case 'store':
 						set((s) => {
 							if (reply.change === 'restore') return {records: reply.files};
-							if (reply.change === 'write') return {records: {...s.records, [reply.path]: reply.content}};
+							if (reply.change === 'write')
+								return {records: {...s.records, [reply.path]: reply.content}};
 							const records = Object.fromEntries(
-								Object.entries(s.records).filter(([p]) => p !== reply.path && !p.startsWith(`${reply.path}/`)),
+								Object.entries(s.records).filter(
+									([p]) => p !== reply.path && !p.startsWith(`${reply.path}/`),
+								),
 							);
 							return {records};
 						});
@@ -399,7 +472,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 				}
 			});
 		});
-		const init: RunnerRequest = {type: 'init', provider: channel.port2, deploymentsDB: options.deploymentsDB, ...(fresh ? {fresh} : {})};
+		const init: RunnerRequest = {
+			type: 'init',
+			provider: channel.port2,
+			deploymentsDB: options.deploymentsDB,
+			...(fresh ? {fresh} : {}),
+		};
 		worker.postMessage(init, [channel.port2]);
 		runner = current;
 		await ready;
@@ -415,7 +493,10 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			saved = await openSavedProject(options.filesDB, files);
 		} catch (error) {
 			// The project still works, from memory: losing the edits at a reload beats not starting.
-			say('warning', `Your files could not be read from this browser's storage, and edits will not be kept: ${messageOf(error)}`);
+			say(
+				'warning',
+				`Your files could not be read from this browser's storage, and edits will not be kept: ${messageOf(error)}`,
+			);
 			return;
 		}
 		const restored = saved.files;
@@ -436,11 +517,17 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			startCompiler();
 			void compileInBackground();
 			typescriptWorker = options.workers.typescript();
-			typescript = wrap<TypeScriptWorkerApi>(typescriptWorker as unknown as Endpoint);
+			typescript = wrap<TypeScriptWorkerApi>(
+				typescriptWorker as unknown as Endpoint,
+			);
 			await startChain(false);
 			await startRunner();
 			// A selected record that is no more (the records are restored by now): the first script.
-			if (!(state.selected in state.files) && !(state.selected in state.records)) set({selected: firstSelected(state.files)});
+			if (
+				!(state.selected in state.files) &&
+				!(state.selected in state.records)
+			)
+				set({selected: firstSelected(state.files)});
 			set({typescriptVersion: await typescript.version});
 			await refreshBlockNumber();
 			set({phase: 'ready'});
@@ -473,17 +560,24 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		}
 		set({diagnostics: compiled.diagnostics});
 		if (compiled.ok) useArtifactTypes(compiled.types);
-		for (const d of compiled.diagnostics) say(d.severity === 'error' ? 'error' : 'warning', formatDiagnostic(d));
+		for (const d of compiled.diagnostics)
+			say(d.severity === 'error' ? 'error' : 'warning', formatDiagnostic(d));
 		if (!compiled.ok) {
 			say('error', 'The contracts did not compile; nothing was sent.');
 			return finish({outcome: 'failed', stage: 'compile', sent: 0});
 		}
 
 		set({phase: 'transpiling'});
-		const transpiled = await typescript!.transpile({...projectFiles, ...compiled.artifacts});
+		const transpiled = await typescript!.transpile({
+			...projectFiles,
+			...compiled.artifacts,
+		});
 		if (transpiled.diagnostics.length > 0) {
-			set((s) => ({diagnostics: [...s.diagnostics, ...transpiled.diagnostics]}));
-			for (const d of transpiled.diagnostics) say(d.severity === 'error' ? 'error' : 'warning', formatDiagnostic(d));
+			set((s) => ({
+				diagnostics: [...s.diagnostics, ...transpiled.diagnostics],
+			}));
+			for (const d of transpiled.diagnostics)
+				say(d.severity === 'error' ? 'error' : 'warning', formatDiagnostic(d));
 		}
 		if (!transpiled.ok) {
 			say('error', 'A script did not parse; nothing was sent.');
@@ -495,11 +589,17 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		const id = ++runId;
 		const result = await new Promise<RunOutcome | 'stopped'>((resolve) => {
 			current.pending = {id, resolve};
-			const request: RunnerRequest = {type: 'run', id, modules: transpiled.modules, imports: transpiled.imports};
+			const request: RunnerRequest = {
+				type: 'run',
+				id,
+				modules: transpiled.modules,
+				imports: transpiled.imports,
+			};
 			current.worker.postMessage(request);
 		});
 		await refreshBlockNumber();
-		if (result === 'stopped') return finish({outcome: 'stopped', stage: 'run', sent: 0});
+		if (result === 'stopped')
+			return finish({outcome: 'stopped', stage: 'run', sent: 0});
 		if (result.namedAccounts) set({namedAccounts: result.namedAccounts});
 		const sent = result.requests.eth_sendRawTransaction ?? 0;
 		const ms = performance.now() - t0;
@@ -512,9 +612,16 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			);
 		} else if (result.error && looksLikeV1Script(result.error, projectFiles)) {
 			// After rocketh's own error, which the runner has logged by now.
-			say('playground', V1_SCRIPT_HINT, {href: MIGRATION_GUIDE_URL, label: MIGRATION_GUIDE_LABEL});
+			say('playground', V1_SCRIPT_HINT, {
+				href: MIGRATION_GUIDE_URL,
+				label: MIGRATION_GUIDE_LABEL,
+			});
 		}
-		return finish({outcome: result.ok ? 'deployed' : 'failed', stage: 'run', sent});
+		return finish({
+			outcome: result.ok ? 'deployed' : 'failed',
+			stage: 'run',
+			sent,
+		});
 	}
 
 	async function stop() {
@@ -524,7 +631,10 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		// Terminating the worker is the only way to end a script that never yields.
 		stopped.worker.terminate();
 		await stopped.served.close();
-		say('playground', 'Stopped: the runner was ended. The chain and the records are untouched.');
+		say(
+			'playground',
+			'Stopped: the runner was ended. The chain and the records are untouched.',
+		);
 		try {
 			await startRunner();
 		} catch (error) {
@@ -540,7 +650,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 	 * no records. `done` is the transcript's line once it has, `failure` what a failure is called,
 	 * `pick` the file to select when it is one of `next`.
 	 */
-	async function replaceProject(next: ProjectFiles, done: string, failure: string, pick?: string) {
+	async function replaceProject(
+		next: ProjectFiles,
+		done: string,
+		failure: string,
+		pick?: string,
+	) {
 		if (state.phase !== 'ready' || !node || !runner) return;
 		set({phase: 'resetting'});
 		try {
@@ -554,10 +669,20 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			node = undefined;
 
 			const previous = state.files;
-			const selected = pick !== undefined && Object.hasOwn(next, pick) ? pick : firstSelected(next);
+			const selected =
+				pick !== undefined && Object.hasOwn(next, pick)
+					? pick
+					: firstSelected(next);
 			clearTimeout(compileTimer);
 			saved?.reset(next, selected);
-			set({files: next, selected, records: {}, diagnostics: [], lastRun: undefined, namedAccounts: undefined});
+			set({
+				files: next,
+				selected,
+				records: {},
+				diagnostics: [],
+				lastRun: undefined,
+				namedAccounts: undefined,
+			});
 			// The language service and the artifact types: the new files, then their compile.
 			if (state.languageService.status === 'ready') {
 				const gone = Object.keys(previous).filter((path) => !(path in next));
@@ -598,10 +723,14 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		set((s) => ({files: {...s.files, [path]: text}}));
 		saved?.write(path, text);
 		// Forwarded at once, so the worker has this text before the editor asks for its lints.
-		if (state.languageService.status === 'ready') void typescript!.setFiles({[path]: text});
+		if (state.languageService.status === 'ready')
+			void typescript!.setFiles({[path]: text});
 		if (path.endsWith('.sol') && compilerWorker) {
 			clearTimeout(compileTimer);
-			compileTimer = setTimeout(() => void compileInBackground(), options.compileDebounceMs ?? 400);
+			compileTimer = setTimeout(
+				() => void compileInBackground(),
+				options.compileDebounceMs ?? 400,
+			);
 		}
 	}
 
@@ -626,13 +755,19 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		set({phase: 'idle'});
 	}
 
-	const languageService = () => (state.languageService.status === 'ready' ? typescript : undefined);
+	const languageService = () =>
+		state.languageService.status === 'ready' ? typescript : undefined;
 
-	const provider = (): ChainProvider | undefined => (node ? (node as unknown as ChainProvider) : undefined);
+	const provider = (): ChainProvider | undefined =>
+		node ? (node as unknown as ChainProvider) : undefined;
 
-	async function transact<T>(send: (provider: ChainProvider) => Promise<T>): Promise<T> {
+	async function transact<T>(
+		send: (provider: ChainProvider) => Promise<T>,
+	): Promise<T> {
 		if (state.phase !== 'ready' || !node) {
-			throw new Error(`The chain is busy (${phaseLabel(state.phase).toLowerCase()}); nothing was sent.`);
+			throw new Error(
+				`The chain is busy (${phaseLabel(state.phase).toLowerCase()}); nothing was sent.`,
+			);
 		}
 		set({phase: 'sending'});
 		try {
@@ -644,5 +779,18 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 		}
 	}
 
-	return {subscribe: store.subscribe, start, deploy, stop, reset, open, edit, select, provider, transact, languageService, dispose};
+	return {
+		subscribe: store.subscribe,
+		start,
+		deploy,
+		stop,
+		reset,
+		open,
+		edit,
+		select,
+		provider,
+		transact,
+		languageService,
+		dispose,
+	};
 }

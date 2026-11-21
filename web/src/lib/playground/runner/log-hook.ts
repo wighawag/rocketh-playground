@@ -25,7 +25,9 @@ const factory = createLogFactory(() => current);
 const scope = globalThis as {_logFactory?: unknown};
 if (scope._logFactory && scope._logFactory !== factory) {
 	// The runner owns its realm; a factory already here means something was loaded first.
-	console.warn('a named-logs factory was already installed in the runner; replacing it');
+	console.warn(
+		'a named-logs factory was already installed in the runner; replacing it',
+	);
 }
 // What `named-logs`' `hook()` sets, read by every copy of named-logs, whichever a package resolved.
 scope._logFactory = factory;

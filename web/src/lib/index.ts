@@ -79,7 +79,8 @@ console.log(`VERSION: ${version}`);
 export function createPlayground() {
 	return createPlaygroundSession({
 		workers: browserWorkers(),
-		soljsonURL: new URL(resolvePath(`/solc/${solc.path}`), document.baseURI).href,
+		soljsonURL: new URL(resolvePath(`/solc/${solc.path}`), document.baseURI)
+			.href,
 		compilerBytes: solc.bytes,
 		chainDB: 'rocketh-playground-chain',
 		deploymentsDB: 'rocketh-playground-deployments',
@@ -92,9 +93,7 @@ export const SOLC_VERSION = solc.version;
  * The shared link this page was opened with, if any: the fragment's `project` key, read once
  * (`hashParams`, above). Its key is dropped from the URL once the link has been dealt with.
  */
-export function openSharedLink(
-	session: ReturnType<typeof createPlayground>,
-) {
+export function openSharedLink(session: ReturnType<typeof createPlayground>) {
 	return createLinkOpener({
 		session,
 		value: hashParams[SHARE_KEY],

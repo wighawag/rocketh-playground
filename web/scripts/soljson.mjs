@@ -9,33 +9,58 @@
 // looked up through `releases[version]`: `builds` also lists nightlies under the same `version`
 // ("0.8.28" with prerelease "nightly.2024.9.4"), so a search by version finds the wrong file.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
 const HOST = 'https://binaries.soliditylang.org/bin';
 const web = new URL('..', import.meta.url);
-export const pinned = JSON.parse(readFileSync(new URL('solc.json', web), 'utf8'));
-export const soljsonPath = fileURLToPath(new URL(`static/solc/${pinned.path}`, web));
+export const pinned = JSON.parse(
+	readFileSync(new URL('solc.json', web), 'utf8'),
+);
+export const soljsonPath = fileURLToPath(
+	new URL(`static/solc/${pinned.path}`, web),
+);
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 export async function ensureSoljson({log = console.log} = {}) {
-	if (existsSync(soljsonPath) && sha256(readFileSync(soljsonPath)) === pinned.sha256) return soljsonPath;
+	if (
+		existsSync(soljsonPath) &&
+		sha256(readFileSync(soljsonPath)) === pinned.sha256
+	)
+		return soljsonPath;
 	const list = await (await fetch(`${HOST}/list.json`)).json();
 	const path = list.releases?.[pinned.version];
 	const build = list.builds?.find((b) => b.path === path);
 	if (path !== pinned.path || !build) {
-		throw new Error(`solc ${pinned.version}: list.json names ${path}, solc.json pins ${pinned.path}`);
+		throw new Error(
+			`solc ${pinned.version}: list.json names ${path}, solc.json pins ${pinned.path}`,
+		);
 	}
 	const listed = build.sha256.replace(/^0x/, '');
-	if (listed !== pinned.sha256) throw new Error(`solc ${pinned.version}: list.json sha256 ${listed}, solc.json pins ${pinned.sha256}`);
+	if (listed !== pinned.sha256)
+		throw new Error(
+			`solc ${pinned.version}: list.json sha256 ${listed}, solc.json pins ${pinned.sha256}`,
+		);
 	const response = await fetch(`${HOST}/${path}`);
-	if (!response.ok) throw new Error(`fetching ${HOST}/${path}: HTTP ${response.status}`);
+	if (!response.ok)
+		throw new Error(`fetching ${HOST}/${path}: HTTP ${response.status}`);
 	const bytes = Buffer.from(await response.arrayBuffer());
 	const actual = sha256(bytes);
-	if (actual !== pinned.sha256) throw new Error(`${path}: sha256 ${actual}, expected ${pinned.sha256}`);
+	if (actual !== pinned.sha256)
+		throw new Error(`${path}: sha256 ${actual}, expected ${pinned.sha256}`);
 	// `bytes` is what the page shows while the compiler loads; a stale value would mislead it.
-	if (bytes.length !== pinned.bytes) throw new Error(`${path}: ${bytes.length} bytes, solc.json says ${pinned.bytes}`);
+	if (bytes.length !== pinned.bytes)
+		throw new Error(
+			`${path}: ${bytes.length} bytes, solc.json says ${pinned.bytes}`,
+		);
 	mkdirSync(new URL('static/solc/', web), {recursive: true});
 	// Several vitest workers can call this at once on a tree with no soljson yet, and each fetches and
 	// writes the file. Writing in place lets one worker read a half-written file while another is still
@@ -49,7 +74,9 @@ export async function ensureSoljson({log = console.log} = {}) {
 		rmSync(temporary, {force: true});
 		throw error;
 	}
-	log(`solc ${pinned.version}: fetched ${path} (${bytes.length} bytes), sha256 matches list.json`);
+	log(
+		`solc ${pinned.version}: fetched ${path} (${bytes.length} bytes), sha256 matches list.json`,
+	);
 	return soljsonPath;
 }
 

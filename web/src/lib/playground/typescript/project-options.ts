@@ -14,7 +14,9 @@ import type tsModule from 'typescript';
 
 export const PROJECT_LIB = ['lib.es2023.d.ts', 'lib.webworker.d.ts'];
 
-export function projectCompilerOptions(ts: typeof tsModule): tsModule.CompilerOptions {
+export function projectCompilerOptions(
+	ts: typeof tsModule,
+): tsModule.CompilerOptions {
 	return {
 		lib: PROJECT_LIB,
 		module: ts.ModuleKind.Node16,
@@ -33,4 +35,7 @@ export function projectCompilerOptions(ts: typeof tsModule): tsModule.CompilerOp
  * The declarations the language service is given: the packages' files laid out under
  * `/node_modules`, and the lib files at `/`, where `@typescript/vfs` looks for them.
  */
-export type Declarations = {files: Record<string, string>; libs: Record<string, string>};
+export type Declarations = {
+	files: Record<string, string>;
+	libs: Record<string, string>;
+};

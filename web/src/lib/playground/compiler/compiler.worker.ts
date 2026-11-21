@@ -10,11 +10,17 @@
 import {serveCompiler} from './compiler-host.js';
 import type {Soljson} from './solidity.js';
 
-declare const Module: (Soljson & {calledRun?: boolean; onRuntimeInitialized?: () => void}) | undefined;
+declare const Module:
+	| (Soljson & {calledRun?: boolean; onRuntimeInitialized?: () => void})
+	| undefined;
 
-async function loadSoljson(url: string, onProgress: (loaded: number) => void): Promise<Soljson> {
+async function loadSoljson(
+	url: string,
+	onProgress: (loaded: number) => void,
+): Promise<Soljson> {
 	const response = await fetch(url);
-	if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${response.url}`);
+	if (!response.ok || !response.body)
+		throw new Error(`HTTP ${response.status} for ${response.url}`);
 	const reader = response.body.getReader();
 	const chunks: Uint8Array<ArrayBuffer>[] = [];
 	let loaded = 0;
@@ -25,17 +31,26 @@ async function loadSoljson(url: string, onProgress: (loaded: number) => void): P
 		loaded += value.length;
 		onProgress(loaded);
 	}
-	const blobURL = URL.createObjectURL(new Blob(chunks, {type: 'text/javascript'}));
+	const blobURL = URL.createObjectURL(
+		new Blob(chunks, {type: 'text/javascript'}),
+	);
 	try {
 		importScripts(blobURL);
 	} finally {
 		URL.revokeObjectURL(blobURL);
 	}
-	if (typeof Module === 'undefined') throw new Error('soljson defined no Module');
+	if (typeof Module === 'undefined')
+		throw new Error('soljson defined no Module');
 	const soljson = Module;
 	// With its wasm inlined, soljson has usually finished initialising by now; wait if not.
-	if (!soljson.calledRun) await new Promise<void>((resolve) => (soljson.onRuntimeInitialized = resolve));
+	if (!soljson.calledRun)
+		await new Promise<void>(
+			(resolve) => (soljson.onRuntimeInitialized = resolve),
+		);
 	return soljson;
 }
 
-serveCompiler(self as unknown as Parameters<typeof serveCompiler>[0], loadSoljson);
+serveCompiler(
+	self as unknown as Parameters<typeof serveCompiler>[0],
+	loadSoljson,
+);

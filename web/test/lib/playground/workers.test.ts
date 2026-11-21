@@ -9,11 +9,17 @@ import 'fake-indexeddb/auto';
 import {describe, it, expect, afterEach} from 'vitest';
 import {createWorkerNode} from 'webevm/worker-client';
 import type {SlimNode} from 'webevm';
-import {exposeEVMNode, type EVMNodeOptions} from '../../../src/lib/playground/evm/evm-host.js';
+import {
+	exposeEVMNode,
+	type EVMNodeOptions,
+} from '../../../src/lib/playground/evm/evm-host.js';
 import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
 import type {RunnerReply} from '../../../src/lib/playground/runner/protocol.js';
 import {CHAIN_ID} from '../../../src/lib/playground/runner/compose-config.js';
-import {INITIAL_BALANCE, TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
+import {
+	INITIAL_BALANCE,
+	TEST_ADDRESSES,
+} from '../../../src/lib/playground/runner/test-keys.js';
 import {prepare, project, sent} from './helpers.js';
 
 const open: {close(): void}[] = [];
@@ -35,7 +41,9 @@ async function evmWorker(db: string): Promise<SlimNode> {
 	return createWorkerNode({
 		worker: worker as unknown as Worker,
 		chainId: CHAIN_ID,
-		initialBalances: Object.fromEntries(TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE])),
+		initialBalances: Object.fromEntries(
+			TEST_ADDRESSES.map((a) => [a, INITIAL_BALANCE]),
+		),
 		indexedDB: db,
 	} as EVMNodeOptions as never);
 }
@@ -69,7 +77,9 @@ async function runnerWorker(node: SlimNode, deploymentsDB: string) {
 			};
 			waiters.push(wait);
 		});
-	page.postMessage({type: 'init', provider: provider.port2, deploymentsDB}, [provider.port2]);
+	page.postMessage({type: 'init', provider: provider.port2, deploymentsDB}, [
+		provider.port2,
+	]);
 	const ready = (await next('ready')) as Extract<RunnerReply, {type: 'ready'}>;
 	let id = 0;
 	return {
@@ -79,13 +89,20 @@ async function runnerWorker(node: SlimNode, deploymentsDB: string) {
 		async run(files = project()) {
 			const {transpiled} = await prepare(files);
 			const runId = ++id;
-			page.postMessage({type: 'run', id: runId, modules: transpiled.modules, imports: transpiled.imports});
-			return ((await next('done')) as Extract<RunnerReply, {type: 'done'}>).outcome;
+			page.postMessage({
+				type: 'run',
+				id: runId,
+				modules: transpiled.modules,
+				imports: transpiled.imports,
+			});
+			return ((await next('done')) as Extract<RunnerReply, {type: 'done'}>)
+				.outcome;
 		},
 	};
 }
 
-const blockNumber = async (node: SlimNode) => Number(await node.request({method: 'eth_blockNumber'} as never));
+const blockNumber = async (node: SlimNode) =>
+	Number(await node.request({method: 'eth_blockNumber'} as never));
 
 describe('the four-worker protocol, over MessageChannels', () => {
 	it('runs the starting project through a port the EVM worker serves, and posts the store changes', async () => {
@@ -95,9 +112,18 @@ describe('the four-worker protocol, over MessageChannels', () => {
 		const outcome = await runner.run();
 		expect(outcome.error).toBeUndefined();
 		expect(sent(outcome.requests)).toBe(1);
-		const writes = runner.replies.filter((r) => r.type === 'store' && r.change === 'write').map((r) => (r as {path: string}).path);
-		expect(writes).toEqual(expect.arrayContaining(['deployments/playground/.chain', 'deployments/playground/Counter.json']));
-		const logs = runner.replies.filter((r) => r.type === 'log').map((r) => (r as {entry: {text: string}}).entry.text);
+		const writes = runner.replies
+			.filter((r) => r.type === 'store' && r.change === 'write')
+			.map((r) => (r as {path: string}).path);
+		expect(writes).toEqual(
+			expect.arrayContaining([
+				'deployments/playground/.chain',
+				'deployments/playground/Counter.json',
+			]),
+		);
+		const logs = runner.replies
+			.filter((r) => r.type === 'log')
+			.map((r) => (r as {entry: {text: string}}).entry.text);
 		expect(logs).toContain('- Executing 01_deploy_counter.ts');
 		expect(await blockNumber(node)).toBe(1);
 		await runner.served.close();
@@ -115,10 +141,15 @@ describe('the four-worker protocol, over MessageChannels', () => {
 		// a reload: a new node and a new runner on the same databases
 		const node = await evmWorker('chain-b');
 		expect(await blockNumber(node)).toBe(1);
-		const code = (await node.request({method: 'eth_getCode', params: [address, 'latest']} as never)) as string;
+		const code = (await node.request({
+			method: 'eth_getCode',
+			params: [address, 'latest'],
+		} as never)) as string;
 		expect(code.length).toBeGreaterThan(2);
 		const runner = await runnerWorker(node, 'records-b');
-		expect(JSON.parse(runner.files['deployments/playground/Counter.json']).address).toBe(address);
+		expect(
+			JSON.parse(runner.files['deployments/playground/Counter.json']).address,
+		).toBe(address);
 		const again = await runner.run();
 		expect(again.error).toBeUndefined();
 		expect(sent(again.requests)).toBe(0);

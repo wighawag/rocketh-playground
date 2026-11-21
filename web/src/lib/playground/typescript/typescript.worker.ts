@@ -14,6 +14,7 @@ import type {Declarations} from './project-options.js';
 
 exposeTypeScript(ts, async () => {
 	const response = await fetch(declarationsURL);
-	if (!response.ok) throw new Error(`HTTP ${response.status} for ${response.url}`);
+	if (!response.ok)
+		throw new Error(`HTTP ${response.status} for ${response.url}`);
 	return (await response.json()) as Declarations;
 });

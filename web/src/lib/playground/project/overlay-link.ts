@@ -37,8 +37,12 @@ export const OVERLAY_FRAGMENT_LIMIT = 32 * 1024;
 export function toBase64URL(bytes: Uint8Array): string {
 	let binary = '';
 	const CHUNK = 0x8000;
-	for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	for (let i = 0; i < bytes.length; i += CHUNK)
+		binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+	return btoa(binary)
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '');
 }
 
 /** JSON with every object's keys in sorted order (`JSON.stringify` would put integer-like keys first). */
@@ -61,15 +65,30 @@ export type OverlayOptions = {
 };
 
 /** The `project` value opening the base (`options.base`) with `files` over it and `select` selected. */
-export function encodeOverlay(files: Record<string, string>, select?: string, options: OverlayOptions = {}): string {
+export function encodeOverlay(
+	files: Record<string, string>,
+	select?: string,
+	options: OverlayOptions = {},
+): string {
 	const {base} = options;
-	if (base !== undefined && !(OVERLAY_BASES as readonly unknown[]).includes(base)) {
-		throw new Error(`a link's base is ${OVERLAY_BASES.map((b) => JSON.stringify(b)).join(' or ')}, or none, not ${JSON.stringify(base)}`);
+	if (
+		base !== undefined &&
+		!(OVERLAY_BASES as readonly unknown[]).includes(base)
+	) {
+		throw new Error(
+			`a link's base is ${OVERLAY_BASES.map((b) => JSON.stringify(b)).join(' or ')}, or none, not ${JSON.stringify(base)}`,
+		);
 	}
-	const value = OVERLAY_VERSION + toBase64URL(deflateSync(strToU8(sortedJSON({base, files, select})), {level: 9}));
+	const value =
+		OVERLAY_VERSION +
+		toBase64URL(
+			deflateSync(strToU8(sortedJSON({base, files, select})), {level: 9}),
+		);
 	const length = 'project='.length + value.length;
 	if (length > OVERLAY_FRAGMENT_LIMIT) {
-		throw new Error(`this link would carry ${length} bytes of fragment, over the ${OVERLAY_FRAGMENT_LIMIT} a link carries`);
+		throw new Error(
+			`this link would carry ${length} bytes of fragment, over the ${OVERLAY_FRAGMENT_LIMIT} a link carries`,
+		);
 	}
 	return value;
 }

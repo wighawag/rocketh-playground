@@ -25,7 +25,11 @@ export const TEMPLATE_FILES: ProjectFiles = Object.fromEntries(
 );
 
 /** Which hardhat-deploy release the template came from. */
-export const TEMPLATE_SOURCE: {package: string; version: string; integrity: string} = record;
+export const TEMPLATE_SOURCE: {
+	package: string;
+	version: string;
+	integrity: string;
+} = record;
 
 /**
  * The files a reader edits: the contract, the deploy script, and rocketh's config and setup.
@@ -48,14 +52,18 @@ export const STARTING_PROJECT_PATHS = [
  * removes these files, and the Counter tests, before writing an example over the template), so
  * that an example deploys there on the base it opens on here: a change to one is made in both.
  */
-export const COUNTER_SAMPLE_PATHS = ['contracts/Counter.sol', 'deploy/01_deploy_counter.ts'] as const;
+export const COUNTER_SAMPLE_PATHS = [
+	'contracts/Counter.sol',
+	'deploy/01_deploy_counter.ts',
+] as const;
 
 /** The template's files at `paths`; throws when one is missing, so a template change is noticed. */
 function templateFiles(paths: readonly string[]): ProjectFiles {
 	const files: ProjectFiles = {};
 	for (const path of paths) {
 		const text = TEMPLATE_FILES[path];
-		if (text === undefined) throw new Error(`the project template has no ${path}`);
+		if (text === undefined)
+			throw new Error(`the project template has no ${path}`);
 		files[path] = text;
 	}
 	return files;
@@ -75,5 +83,7 @@ export function startingProject(): ProjectFiles {
 export function bareProject(): ProjectFiles {
 	templateFiles(COUNTER_SAMPLE_PATHS);
 	const sample: readonly string[] = COUNTER_SAMPLE_PATHS;
-	return templateFiles(STARTING_PROJECT_PATHS.filter((path) => !sample.includes(path)));
+	return templateFiles(
+		STARTING_PROJECT_PATHS.filter((path) => !sample.includes(path)),
+	);
 }

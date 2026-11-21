@@ -13,15 +13,32 @@ import {serveCompiler} from '../../../src/lib/playground/compiler/compiler-host.
 import {exposeTypeScript} from '../../../src/lib/playground/typescript/typescript-host.js';
 import {exposeEVMNode} from '../../../src/lib/playground/evm/evm-host.js';
 import {serveRunner} from '../../../src/lib/playground/runner/runner-host.js';
-import {createPlaygroundSession, type PlaygroundSession, type PlaygroundWorkers, type WorkerLike} from '../../../src/lib/playground/session.js';
-import {startingProject, TEMPLATE_FILES} from '../../../src/lib/playground/project/template.js';
+import {
+	createPlaygroundSession,
+	type PlaygroundSession,
+	type PlaygroundWorkers,
+	type WorkerLike,
+} from '../../../src/lib/playground/session.js';
+import {
+	startingProject,
+	TEMPLATE_FILES,
+} from '../../../src/lib/playground/project/template.js';
 import {TEST_ADDRESSES} from '../../../src/lib/playground/runner/test-keys.js';
-import {MIGRATION_GUIDE_URL, V1_SCRIPT_HINT} from '../../../src/lib/playground/migration.js';
+import {
+	MIGRATION_GUIDE_URL,
+	V1_SCRIPT_HINT,
+} from '../../../src/lib/playground/migration.js';
 import {contractsFromRecords} from '../../../src/lib/playground/contracts/records.js';
 import {writeFunction} from '../../../src/lib/playground/contracts/chain-calls.js';
 import {collectDeclarations} from '../../../scripts/declarations.mjs';
-import {BARE_MODULE_NAMES, TYPE_ONLY_MODULES} from '../../../src/lib/playground/runner/bare-modules.js';
-import {projectCompilerOptions, type Declarations} from '../../../src/lib/playground/typescript/project-options.js';
+import {
+	BARE_MODULE_NAMES,
+	TYPE_ONLY_MODULES,
+} from '../../../src/lib/playground/runner/bare-modules.js';
+import {
+	projectCompilerOptions,
+	type Declarations,
+} from '../../../src/lib/playground/typescript/project-options.js';
 
 const COMPILER_BYTES = 9169169;
 
@@ -30,7 +47,8 @@ function inProcess(serve: (port: MessagePort) => void): WorkerLike {
 	const {port1, port2} = new MessageChannel();
 	serve(port1);
 	return {
-		postMessage: (message, transfer) => port2.postMessage(message, transfer ?? []),
+		postMessage: (message, transfer) =>
+			port2.postMessage(message, transfer ?? []),
 		addEventListener: (type, listener) => {
 			if (type !== 'message') return; // a port never fires `error`
 			port2.addEventListener('message', listener as never);
@@ -45,10 +63,14 @@ function inProcess(serve: (port: MessagePort) => void): WorkerLike {
 
 let declarations: Declarations | undefined;
 const loadDeclarations = async () =>
-	(declarations ??= collectDeclarations({specifiers: [...BARE_MODULE_NAMES, ...TYPE_ONLY_MODULES], compilerOptions: projectCompilerOptions(ts)}));
+	(declarations ??= collectDeclarations({
+		specifiers: [...BARE_MODULE_NAMES, ...TYPE_ONLY_MODULES],
+		compilerOptions: projectCompilerOptions(ts),
+	}));
 
 const workers: PlaygroundWorkers = {
-	typescript: () => inProcess((port) => exposeTypeScript(ts, loadDeclarations, port)),
+	typescript: () =>
+		inProcess((port) => exposeTypeScript(ts, loadDeclarations, port)),
 	compiler: () =>
 		inProcess((port) =>
 			serveCompiler(port as never, async (_url, onProgress) => {
@@ -81,7 +103,8 @@ async function started(db: string) {
 	return session;
 }
 
-const lines = (session: PlaygroundSession) => get(session).transcript.map((l) => `[${l.source}] ${l.text}`);
+const lines = (session: PlaygroundSession) =>
+	get(session).transcript.map((l) => `[${l.source}] ${l.text}`);
 
 /**
  * Every test here boots a whole session: the compiler (soljson), TypeScript with the project's
@@ -104,33 +127,62 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		expect(run).toMatchObject({outcome: 'deployed', stage: 'run', sent: 1});
 		const state = get(session);
 		expect(state.phase).toBe('ready');
-		expect(state.compiler).toMatchObject({status: 'ready', loaded: COMPILER_BYTES, total: COMPILER_BYTES});
-		expect(Object.keys(state.records).sort()).toEqual(['deployments/playground/.chain', 'deployments/playground/Counter.json']);
+		expect(state.compiler).toMatchObject({
+			status: 'ready',
+			loaded: COMPILER_BYTES,
+			total: COMPILER_BYTES,
+		});
+		expect(Object.keys(state.records).sort()).toEqual([
+			'deployments/playground/.chain',
+			'deployments/playground/Counter.json',
+		]);
 		expect(state.blockNumber).toBe(1);
-		expect(lines(session)).toContain('[rocketh] - Executing 01_deploy_counter.ts');
-		expect(lines(session).at(-1)).toMatch(/^\[success\] Done in \d+ ms: 1 transaction sent\.$/);
+		expect(lines(session)).toContain(
+			'[rocketh] - Executing 01_deploy_counter.ts',
+		);
+		expect(lines(session).at(-1)).toMatch(
+			/^\[success\] Done in \d+ ms: 1 transaction sent\.$/,
+		);
 
 		const again = await session.deploy();
 		expect(again).toMatchObject({outcome: 'deployed', sent: 0});
-		expect(lines(session).at(-1)).toMatch(/nothing to send, everything is deployed already\.$/);
+		expect(lines(session).at(-1)).toMatch(
+			/nothing to send, everything is deployed already\.$/,
+		);
 	});
 
 	it('shows a Solidity error with its file and line, and sends nothing', async () => {
 		const session = await started('b');
-		session.edit('contracts/Counter.sol', TEMPLATE_FILES['contracts/Counter.sol'].replace('x++;', 'x++'));
+		session.edit(
+			'contracts/Counter.sol',
+			TEMPLATE_FILES['contracts/Counter.sol'].replace('x++;', 'x++'),
+		);
 		const run = await session.deploy();
 		expect(run).toMatchObject({outcome: 'failed', stage: 'compile', sent: 0});
-		expect(get(session).diagnostics[0]).toMatchObject({file: 'contracts/Counter.sol', line: 11, severity: 'error'});
-		expect(lines(session)).toContain('[error] The contracts did not compile; nothing was sent.');
+		expect(get(session).diagnostics[0]).toMatchObject({
+			file: 'contracts/Counter.sol',
+			line: 11,
+			severity: 'error',
+		});
+		expect(lines(session)).toContain(
+			'[error] The contracts did not compile; nothing was sent.',
+		);
 		expect(get(session).blockNumber).toBe(0);
 	});
 
 	it('shows a TypeScript syntax error with its file and line, and sends nothing', async () => {
 		const session = await started('c');
-		session.edit('deploy/01_deploy_counter.ts', `${TEMPLATE_FILES['deploy/01_deploy_counter.ts']}\nconst broken = ;\n`);
+		session.edit(
+			'deploy/01_deploy_counter.ts',
+			`${TEMPLATE_FILES['deploy/01_deploy_counter.ts']}\nconst broken = ;\n`,
+		);
 		const run = await session.deploy();
 		expect(run).toMatchObject({outcome: 'failed', stage: 'transpile', sent: 0});
-		expect(lines(session).some((l) => l.startsWith('[error] deploy/01_deploy_counter.ts:15:'))).toBe(true);
+		expect(
+			lines(session).some((l) =>
+				l.startsWith('[error] deploy/01_deploy_counter.ts:15:'),
+			),
+		).toBe(true);
 	});
 
 	it("points a v1-style deploy script to the migration guide, after rocketh's own error, and an ordinary error to nothing", async () => {
@@ -140,27 +192,55 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 			DEPLOY,
 			"import {DeployFunction} from 'hardhat-deploy/types';\n\nconst func: DeployFunction = async function ({deployments, getNamedAccounts}) {\n\tconst {deployer} = await getNamedAccounts();\n\tawait deployments.deploy('Counter', {from: deployer});\n};\nexport default func;\n",
 		);
-		expect(await session.deploy()).toMatchObject({outcome: 'failed', stage: 'run', sent: 0});
+		expect(await session.deploy()).toMatchObject({
+			outcome: 'failed',
+			stage: 'run',
+			sent: 0,
+		});
 		const transcript = get(session).transcript;
-		expect(transcript.at(-2)).toMatchObject({source: 'error', text: 'getNamedAccounts is not a function'});
-		expect(transcript.at(-1)).toMatchObject({source: 'playground', text: V1_SCRIPT_HINT, link: {href: MIGRATION_GUIDE_URL}});
+		expect(transcript.at(-2)).toMatchObject({
+			source: 'error',
+			text: 'getNamedAccounts is not a function',
+		});
+		expect(transcript.at(-1)).toMatchObject({
+			source: 'playground',
+			text: V1_SCRIPT_HINT,
+			link: {href: MIGRATION_GUIDE_URL},
+		});
 
-		session.edit(DEPLOY, "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tthrow new Error('failed on purpose');\n}, {});\n");
-		expect(await session.deploy()).toMatchObject({outcome: 'failed', stage: 'run'});
-		expect(get(session).transcript.at(-1)).toMatchObject({source: 'error', text: 'failed on purpose'});
+		session.edit(
+			DEPLOY,
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tthrow new Error('failed on purpose');\n}, {});\n",
+		);
+		expect(await session.deploy()).toMatchObject({
+			outcome: 'failed',
+			stage: 'run',
+		});
+		expect(get(session).transcript.at(-1)).toMatchObject({
+			source: 'error',
+			text: 'failed on purpose',
+		});
 		expect(get(session).transcript.filter((l) => l.link)).toHaveLength(1);
 	});
 
 	it('restores the chain and the records in a new session, which then sends nothing', async () => {
 		const first = await started('d');
 		await first.deploy();
-		const address = JSON.parse(get(first).records['deployments/playground/Counter.json']).address;
+		const address = JSON.parse(
+			get(first).records['deployments/playground/Counter.json'],
+		).address;
 		await first.dispose();
 
 		const reloaded = await started('d');
 		expect(get(reloaded).blockNumber).toBe(1);
-		expect(JSON.parse(get(reloaded).records['deployments/playground/Counter.json']).address).toBe(address);
-		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 0});
+		expect(
+			JSON.parse(get(reloaded).records['deployments/playground/Counter.json'])
+				.address,
+		).toBe(address);
+		expect(await reloaded.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 0,
+		});
 	});
 
 	it('starts a new session from the files and the selection saved by the last one, typed and compiled from them', async () => {
@@ -168,23 +248,41 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		const COUNTER = 'contracts/Counter.sol';
 		const first = await started('h');
 		// Counter takes a start value; the script passes a number where viem wants a bigint
-		const counter = TEMPLATE_FILES[COUNTER].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }');
-		const script = TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],');
+		const counter = TEMPLATE_FILES[COUNTER].replace(
+			'uint public x;',
+			'uint public x;\n  constructor(uint start) { x = start; }',
+		);
+		const script = TEMPLATE_FILES[DEPLOY].replace(
+			'artifact: artifacts.Counter,',
+			'artifact: artifacts.Counter,\n\t\t\targs: [1],',
+		);
 		first.edit(COUNTER, counter);
 		first.edit(DEPLOY, script);
 		first.select(COUNTER);
 		await first.dispose();
 
 		const reloaded = await started('h');
-		expect(get(reloaded).files).toEqual({...startingProject(), [COUNTER]: counter, [DEPLOY]: script});
+		expect(get(reloaded).files).toEqual({
+			...startingProject(),
+			[COUNTER]: counter,
+			[DEPLOY]: script,
+		});
 		expect(get(reloaded).selected).toBe(COUNTER);
 		// the language service has the saved script, and the background compile the saved contract
-		await expect.poll(() => get(reloaded).languageService.status, {timeout: 20_000}).toBe('ready');
+		await expect
+			.poll(() => get(reloaded).languageService.status, {timeout: 20_000})
+			.toBe('ready');
 		const service = reloaded.languageService()!;
-		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
-			"Type 'number' is not assignable to type 'bigint'.",
-		]);
-		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		await expect
+			.poll(
+				async () => (await service.diagnostics(DEPLOY)).map((d) => d.message),
+				{timeout: 20_000},
+			)
+			.toEqual(["Type 'number' is not assignable to type 'bigint'."]);
+		expect(await reloaded.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 1,
+		});
 	});
 
 	it('starts from the starting project on an empty files database', async () => {
@@ -200,15 +298,35 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		await session.deploy();
 		expect(get(session).blockNumber).toBe(1);
 		// edits the language service flags (a number where viem wants a bigint), a new file, another selection
-		session.edit(COUNTER, TEMPLATE_FILES[COUNTER].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }'));
-		session.edit(DEPLOY, TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],'));
-		session.edit('deploy/02_more.ts', "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n");
+		session.edit(
+			COUNTER,
+			TEMPLATE_FILES[COUNTER].replace(
+				'uint public x;',
+				'uint public x;\n  constructor(uint start) { x = start; }',
+			),
+		);
+		session.edit(
+			DEPLOY,
+			TEMPLATE_FILES[DEPLOY].replace(
+				'artifact: artifacts.Counter,',
+				'artifact: artifacts.Counter,\n\t\t\targs: [1],',
+			),
+		);
+		session.edit(
+			'deploy/02_more.ts',
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n",
+		);
 		session.select(COUNTER);
-		await expect.poll(() => get(session).languageService.status, {timeout: 20_000}).toBe('ready');
+		await expect
+			.poll(() => get(session).languageService.status, {timeout: 20_000})
+			.toBe('ready');
 		const service = session.languageService()!;
-		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
-			"Type 'number' is not assignable to type 'bigint'.",
-		]);
+		await expect
+			.poll(
+				async () => (await service.diagnostics(DEPLOY)).map((d) => d.message),
+				{timeout: 20_000},
+			)
+			.toEqual(["Type 'number' is not assignable to type 'bigint'."]);
 
 		const phases: string[] = [];
 		const unsubscribe = session.subscribe((s) => phases.push(s.phase));
@@ -216,7 +334,13 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		unsubscribe();
 		expect(phases).toContain('resetting');
 		const state = get(session);
-		expect(state).toMatchObject({phase: 'ready', blockNumber: 0, records: {}, selected: DEPLOY, diagnostics: []});
+		expect(state).toMatchObject({
+			phase: 'ready',
+			blockNumber: 0,
+			records: {},
+			selected: DEPLOY,
+			diagnostics: [],
+		});
 		expect(state.files).toEqual(startingProject());
 		expect(state.lastRun).toBeUndefined();
 		expect(state.namedAccounts).toBeUndefined();
@@ -224,35 +348,62 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 			'[playground] Reset: the starting project, a new chain at block 0 and no deployment records. Your edits and the old chain are gone.',
 		);
 		// the language service has the starting files again, typed with their artifact types
-		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([]);
+		await expect
+			.poll(
+				async () => (await service.diagnostics(DEPLOY)).map((d) => d.message),
+				{timeout: 20_000},
+			)
+			.toEqual([]);
 		// the reset chain serves the Contracts view's reads
-		expect(await session.provider()!.request({method: 'eth_blockNumber'})).toBe('0x0');
+		expect(await session.provider()!.request({method: 'eth_blockNumber'})).toBe(
+			'0x0',
+		);
 
-		expect(await session.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		expect(await session.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 1,
+		});
 		expect(get(session).blockNumber).toBe(1);
 		await session.reset();
 		await session.dispose();
 
 		// what was saved is the starting project, the fresh chain and no records
 		const reloaded = await started('j');
-		expect(get(reloaded)).toMatchObject({blockNumber: 0, records: {}, selected: DEPLOY});
+		expect(get(reloaded)).toMatchObject({
+			blockNumber: 0,
+			records: {},
+			selected: DEPLOY,
+		});
 		expect(get(reloaded).files).toEqual(startingProject());
-		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		expect(await reloaded.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 1,
+		});
 	});
 
 	it("opens a link's files as Reset does, on a fresh chain with no records, runs nothing, and a new session starts from them", async () => {
 		const DEPLOY = 'deploy/01_deploy_counter.ts';
 		const session = await started('l');
 		await session.deploy();
-		session.edit('deploy/02_mine.ts', "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n");
+		session.edit(
+			'deploy/02_mine.ts',
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n",
+		);
 		const linked = {
 			...startingProject(),
 			[DEPLOY]: `${TEMPLATE_FILES[DEPLOY]}\n// from a link\n`,
-			'deploy/00_shared.ts': "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('the shared script ran');\n}, {});\n",
+			'deploy/00_shared.ts':
+				"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('the shared script ran');\n}, {});\n",
 		};
 		await session.open(linked);
 		const state = get(session);
-		expect(state).toMatchObject({phase: 'ready', blockNumber: 0, records: {}, selected: DEPLOY, diagnostics: []});
+		expect(state).toMatchObject({
+			phase: 'ready',
+			blockNumber: 0,
+			records: {},
+			selected: DEPLOY,
+			diagnostics: [],
+		});
 		expect(state.files).toEqual(linked);
 		expect(state.lastRun).toBeUndefined();
 		expect(lines(session).at(-1)).toBe(
@@ -264,22 +415,32 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		const reloaded = await started('l');
 		expect(get(reloaded)).toMatchObject({blockNumber: 0, records: {}});
 		expect(get(reloaded).files).toEqual(linked);
-		expect(await reloaded.deploy()).toMatchObject({outcome: 'deployed', sent: 1});
+		expect(await reloaded.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 1,
+		});
 		expect(lines(reloaded)).toContain('[script] the shared script ran');
-	
+
 		// a link may name the file to select; one it does not hold falls back to the first deploy script
 		await reloaded.open(linked, 'contracts/Counter.sol');
-		expect(get(reloaded)).toMatchObject({phase: 'ready', blockNumber: 0, selected: 'contracts/Counter.sol'});
+		expect(get(reloaded)).toMatchObject({
+			phase: 'ready',
+			blockNumber: 0,
+			selected: 'contracts/Counter.sol',
+		});
 		await reloaded.open(linked, 'contracts/Missing.sol');
 		expect(get(reloaded)).toMatchObject({phase: 'ready', selected: DEPLOY});
 	});
 
 	it('refuses to reset while a run is in progress, changing nothing', async () => {
 		const session = await started('k');
-		const wait = "import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {});\n";
+		const wait =
+			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {});\n";
 		session.edit('deploy/02_wait.ts', wait);
 		const running = session.deploy();
-		await expect.poll(() => lines(session).includes('[script] waiting forever')).toBe(true);
+		await expect
+			.poll(() => lines(session).includes('[script] waiting forever'))
+			.toBe(true);
 		await session.reset();
 		expect(get(session).phase).toBe('running');
 		expect(get(session).files['deploy/02_wait.ts']).toBe(wait);
@@ -297,7 +458,9 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {dependencies: ['Counter']});\n",
 		);
 		const running = session.deploy();
-		await expect.poll(() => lines(session).includes('[script] waiting forever')).toBe(true);
+		await expect
+			.poll(() => lines(session).includes('[script] waiting forever'))
+			.toBe(true);
 		expect(get(session).phase).toBe('running');
 		await session.stop();
 		expect(await running).toMatchObject({outcome: 'stopped'});
@@ -309,22 +472,40 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 			'deploy/02_wait.ts',
 			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {}, {});\n",
 		);
-		expect(await session.deploy()).toMatchObject({outcome: 'deployed', sent: 0});
+		expect(await session.deploy()).toMatchObject({
+			outcome: 'deployed',
+			sent: 0,
+		});
 	});
 
 	it('reports the named accounts a run resolved, and gives a write the chain only while ready', async () => {
 		const session = await started('g');
 		expect(get(session).namedAccounts).toBeUndefined();
 		await session.deploy();
-		expect(get(session).namedAccounts).toEqual({deployer: TEST_ADDRESSES[0], admin: TEST_ADDRESSES[1]});
+		expect(get(session).namedAccounts).toEqual({
+			deployer: TEST_ADDRESSES[0],
+			admin: TEST_ADDRESSES[1],
+		});
 
 		const [counter] = contractsFromRecords(get(session).records);
 		const inc = counter.writeFunctions.find((f) => f.name === 'inc')!;
 		const phases: string[] = [];
 		const unsubscribe = session.subscribe((s) => phases.push(s.phase));
-		const outcome = await session.transact((provider) => writeFunction({provider, abiItem: inc, contract: counter, inputValues: {}, keyIndex: 1}));
+		const outcome = await session.transact((provider) =>
+			writeFunction({
+				provider,
+				abiItem: inc,
+				contract: counter,
+				inputValues: {},
+				keyIndex: 1,
+			}),
+		);
 		unsubscribe();
-		expect(outcome).toMatchObject({status: 'success', from: TEST_ADDRESSES[1], blockNumber: 2n});
+		expect(outcome).toMatchObject({
+			status: 'success',
+			from: TEST_ADDRESSES[1],
+			blockNumber: 2n,
+		});
 		expect(phases).toContain('sending');
 		expect(get(session)).toMatchObject({phase: 'ready', blockNumber: 2});
 
@@ -334,8 +515,12 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 			"import {deployScript} from '../rocketh/deploy.js';\n\nexport default deployScript(async () => {\n\tconsole.log('waiting forever');\n\tawait new Promise(() => {});\n}, {dependencies: ['Counter']});\n",
 		);
 		const running = session.deploy();
-		await expect.poll(() => lines(session).includes('[script] waiting forever')).toBe(true);
-		await expect(session.transact(async () => 'sent')).rejects.toThrow('The chain is busy (running the deploy scripts); nothing was sent.');
+		await expect
+			.poll(() => lines(session).includes('[script] waiting forever'))
+			.toBe(true);
+		await expect(session.transact(async () => 'sent')).rejects.toThrow(
+			'The chain is busy (running the deploy scripts); nothing was sent.',
+		);
 		await session.stop();
 		await running;
 		expect(get(session)).toMatchObject({phase: 'ready', blockNumber: 2});
@@ -344,7 +529,9 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 
 	it('types the project before any Deploy, flags a wrong constructor argument, and still runs it', async () => {
 		const session = await started('f');
-		await expect.poll(() => get(session).languageService.status, {timeout: 20_000}).toBe('ready');
+		await expect
+			.poll(() => get(session).languageService.status, {timeout: 20_000})
+			.toBe('ready');
 		const service = session.languageService()!;
 		const DEPLOY = 'deploy/01_deploy_counter.ts';
 		// the starting project, typed from the background compile's artifact types
@@ -352,11 +539,26 @@ describe('a playground session', {timeout: SESSION_TEST_TIMEOUT}, () => {
 		expect(await service.diagnostics(DEPLOY)).toEqual([]);
 
 		// Counter takes a start value; the script passes a number where viem wants a bigint
-		session.edit('contracts/Counter.sol', TEMPLATE_FILES['contracts/Counter.sol'].replace('uint public x;', 'uint public x;\n  constructor(uint start) { x = start; }'));
-		session.edit(DEPLOY, TEMPLATE_FILES[DEPLOY].replace('artifact: artifacts.Counter,', 'artifact: artifacts.Counter,\n\t\t\targs: [1],'));
-		await expect.poll(async () => (await service.diagnostics(DEPLOY)).map((d) => d.message), {timeout: 20_000}).toEqual([
-			"Type 'number' is not assignable to type 'bigint'.",
-		]);
+		session.edit(
+			'contracts/Counter.sol',
+			TEMPLATE_FILES['contracts/Counter.sol'].replace(
+				'uint public x;',
+				'uint public x;\n  constructor(uint start) { x = start; }',
+			),
+		);
+		session.edit(
+			DEPLOY,
+			TEMPLATE_FILES[DEPLOY].replace(
+				'artifact: artifacts.Counter,',
+				'artifact: artifacts.Counter,\n\t\t\targs: [1],',
+			),
+		);
+		await expect
+			.poll(
+				async () => (await service.diagnostics(DEPLOY)).map((d) => d.message),
+				{timeout: 20_000},
+			)
+			.toEqual(["Type 'number' is not assignable to type 'bigint'."]);
 		expect(get(session).blockNumber).toBe(0);
 
 		const run = await session.deploy();
