@@ -12,7 +12,9 @@ import {withoutFragmentKey} from '../../../src/lib/playground/project/link-fragm
 import {tooBigLabel} from '../../../src/lib/playground/project/share.js';
 import {encodeProject, decodeProject, SHARE_FRAGMENT_LIMIT} from '../../../src/lib/playground/project/share-link.js';
 import {encodeOverlay} from '../../../src/lib/playground/project/overlay-link.js';
-import {startingProject} from '../../../src/lib/playground/project/template.js';
+import {bareProject, startingProject} from '../../../src/lib/playground/project/template.js';
+import {deflateSync, strToU8} from 'fflate';
+import {toBase64URL} from '../../../src/lib/playground/project/overlay-link.js';
 import type {Phase} from '../../../src/lib/playground/session.js';
 import type {ProjectFiles} from '../../../src/lib/playground/project/template.js';
 
@@ -191,6 +193,57 @@ describe('opening a link', () => {
 		await link.begin();
 		expect(get(link)).toEqual({status: 'invalid', error: 'it selects "deploy/04.ts", which is not one of its files'});
 		expect(session.opened).toEqual([]);
+		expect(removed).toEqual([1]);
+	});
+
+	it('opens a bare `2.` link at once on a first visit: its files over the starting project without Counter', async () => {
+		const session = fakeSession(startingProject());
+		const files = {'contracts/Greeter.sol': '// greeter\n', 'deploy/02_deploy_greeter.ts': '// greeter\n'};
+		const {link, removed} = opener(session, encodeOverlay(files, 'deploy/02_deploy_greeter.ts', {base: 'bare'}));
+		const begun = link.begin();
+		session.become('ready');
+		await begun;
+		expect(session.opened).toEqual([{...bareProject(), ...files}]);
+		expect(Object.keys(session.opened[0]).sort()).toEqual(['contracts/Greeter.sol', 'deploy/02_deploy_greeter.ts', 'rocketh/config.ts', 'rocketh/deploy.ts']);
+		expect(session.selected).toEqual(['deploy/02_deploy_greeter.ts']);
+		expect(get(link)).toEqual({status: 'none'});
+		expect(removed).toEqual([1]);
+	});
+
+	it("asks before a bare `2.` link replaces the reader's own project", async () => {
+		const session = fakeSession({...startingProject(), 'deploy/02.ts': '// mine\n'}, 'ready');
+		const {link} = opener(session, encodeOverlay({'deploy/03.ts': '// linked\n'}, undefined, {base: 'bare'}));
+		await link.begin();
+		expect(get(link)).toEqual({status: 'confirm'});
+		await link.confirm();
+		expect(session.opened).toEqual([{...bareProject(), 'deploy/03.ts': '// linked\n'}]);
+	});
+
+	it('takes the bases it is given: `starting` for what is no project of the reader\'s, `bare` for what a bare link goes over', async () => {
+		const starting = {'a.ts': '// starting\n'};
+		const bare = {'b.ts': '// bare\n'};
+		const session = fakeSession(starting, 'ready');
+		const removed: number[] = [];
+		const link = createLinkOpener({session, value: encodeOverlay({'c.ts': ''}, undefined, {base: 'bare'}), removeFromURL: () => removed.push(1), starting, bare});
+		await link.begin();
+		expect(session.opened).toEqual([{'b.ts': '// bare\n', 'c.ts': ''}]);
+	});
+
+	it('reports a link from a newer playground, opens nothing, and keeps the key so a reload can open it', async () => {
+		const newer = (content: unknown) => '2.' + toBase64URL(deflateSync(strToU8(JSON.stringify(content)), {level: 9}));
+		for (const value of [newer({files: {}, theme: 'dark'}), newer({base: 'minimal', files: {}})]) {
+			const session = fakeSession(startingProject(), 'ready');
+			const {link, removed} = opener(session, value);
+			await link.begin();
+			expect(get(link)).toEqual({status: 'failed', error: 'it needs a newer version of the playground than this one; reload the page to open it'});
+			expect(session.opened).toEqual([]);
+			expect(removed).toEqual([]);
+		}
+		// a `base` of the wrong type is corrupted: reported, and the key is dropped
+		const session = fakeSession(startingProject(), 'ready');
+		const {link, removed} = opener(session, newer({base: 1, files: {}}));
+		await link.begin();
+		expect(get(link)).toMatchObject({status: 'invalid'});
 		expect(removed).toEqual([1]);
 	});
 
