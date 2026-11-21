@@ -164,9 +164,10 @@ export type PlaygroundSession = Readable<PlaygroundState> & {
 	/**
 	 * Open a shared link's files as `reset()` gives the starting project: `files` in place of the
 	 * reader's, saved over them, on a fresh chain at block 0 with no records. Nothing runs until
-	 * Deploy. Only while `ready`; does nothing otherwise.
+	 * Deploy. `selected` is the file to select, when it is one of `files` (the first deploy script
+	 * otherwise). Only while `ready`; does nothing otherwise.
 	 */
-	open(files: ProjectFiles): Promise<void>;
+	open(files: ProjectFiles, selected?: string): Promise<void>;
 	/** The in-tab chain, for the Contracts view's reads, once it has started. */
 	provider(): ChainProvider | undefined;
 	/**
@@ -536,9 +537,10 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 
 	/**
 	 * Reset and opening a link: `next` in place of the files, saved over them, a fresh chain and
-	 * no records. `done` is the transcript's line once it has, `failure` what a failure is called.
+	 * no records. `done` is the transcript's line once it has, `failure` what a failure is called,
+	 * `pick` the file to select when it is one of `next`.
 	 */
-	async function replaceProject(next: ProjectFiles, done: string, failure: string) {
+	async function replaceProject(next: ProjectFiles, done: string, failure: string, pick?: string) {
 		if (state.phase !== 'ready' || !node || !runner) return;
 		set({phase: 'resetting'});
 		try {
@@ -552,7 +554,7 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			node = undefined;
 
 			const previous = state.files;
-			const selected = firstSelected(next);
+			const selected = pick !== undefined && Object.hasOwn(next, pick) ? pick : firstSelected(next);
 			clearTimeout(compileTimer);
 			saved?.reset(next, selected);
 			set({files: next, selected, records: {}, diagnostics: [], lastRun: undefined, namedAccounts: undefined});
@@ -584,11 +586,12 @@ export function createPlaygroundSession(options: SessionOptions): PlaygroundSess
 			'The playground could not reset',
 		);
 
-	const open = (next: ProjectFiles) =>
+	const open = (next: ProjectFiles, selected?: string) =>
 		replaceProject(
 			next,
 			'Opened the shared project: its files, a new chain at block 0 and no deployment records. Nothing has run: press Deploy to run its scripts.',
 			'The playground could not open the shared project',
+			selected,
 		);
 
 	function edit(path: string, text: string) {

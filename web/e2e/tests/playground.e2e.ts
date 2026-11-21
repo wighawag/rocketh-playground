@@ -584,6 +584,33 @@ test("a link over the reader's own project asks first: Cancel keeps it, Open (af
 	await expect(page.locator(TRANSCRIPT)).not.toContainText('the shared script ran');
 });
 
+/** The `2.` encoding's shared test vector: files over the starting project and the file to select. */
+const OVERLAY_VECTOR = JSON.parse(readFileSync(new URL('../../test/lib/playground/overlay-link-vector.json', import.meta.url), 'utf8')) as {
+	files: Record<string, string>;
+	select: string;
+	value: string;
+};
+
+test("a `2.` link (rocketh.dev's Open in playground) opens the starting project with its files over it, its file selected, and nothing runs", async ({page}) => {
+	const added = Object.keys(OVERLAY_VECTOR.files);
+	expect(added).toContain(OVERLAY_VECTOR.select);
+	await page.goto(`${PLAIN_URL}/#project=${OVERLAY_VECTOR.value}`);
+	await expect(page.locator(TRANSCRIPT)).toContainText('Opened the shared project', {timeout: 60_000});
+	await ready(page);
+	await noProjectKeyInURL(page);
+	await expect(page.getByTestId('link-dialog')).toBeHidden();
+	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
+	await expect(page.getByTestId('record-files')).toHaveText('None yet: press Deploy.');
+	await expect(page.getByTestId('last-run')).toBeHidden();
+	// the starting project's four files, and the link's over them
+	const files = page.locator('[data-testid="project-files"] [data-path]');
+	await expect(files).toHaveCount(4 + added.length);
+	for (const path of [COUNTER, DEPLOY, ...added]) await expect(page.locator(`[data-testid="project-files"] [data-path="${path}"]`)).toBeVisible();
+	await expect(editor(page)).toHaveAttribute('aria-label', OVERLAY_VECTOR.select);
+	await expect(editor(page)).toContainText("await deploy('Greeter', {");
+	await expect(page.locator(TRANSCRIPT)).not.toContainText('Executing');
+});
+
 test('a corrupted link is reported and loads nothing', async ({page}) => {
 	await page.goto(`${PLAIN_URL}/#project=1.notaproject`);
 	await expect(page.getByTestId('link-error')).toContainText('The shared link could not be opened: it is corrupted or cut short.');
