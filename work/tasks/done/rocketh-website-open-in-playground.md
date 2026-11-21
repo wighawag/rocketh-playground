@@ -41,3 +41,18 @@ The build fails, naming the page and line, when the example folder or the named 
 > The repositories are public: no file, pull request or commit message names a funder, a grant, a milestone or a report; describe a change by what it does for a user. Never write em dashes; do not hard-wrap Markdown prose. Bound every shell command with `timeout`, stop any server you start, and never send a transaction.
 >
 > RECORD non-obvious in-scope decisions you make while building in a `## Decisions` block at the end of your FINAL REPORT. When the task did not specify some behaviour and you had to choose, say what you chose and why. Do not write the done record, the commit message or the PR body yourself.
+
+## Delivered
+
+Built in wighawag/rocketh-website by https://github.com/wighawag/rocketh-website/pull/9 (squash-merged as `3276f4c`). It reaches rocketh.dev when rocketh's `.github/workflows/deploy.yml` pins `ROCKETH_WEBSITE_REF` at or after that commit.
+
+## Decisions
+- **Encoder copy as `.js` with JSDoc types, not the `.ts` file as it is.** `docs.config.js` is loaded by native Node (the Vite plugin and `postbuild.js`), and CI runs Node 22. Loading a `.ts` import there depends on which Node 22 minor version has type stripping on. The code is otherwise the same, and the vector test enforces identical output.
+- **Location:** a folder `web/open-in-playground/` holding the handler and the encoder copy, imported by `docs.config.js`. This follows README's "docs.config.js and a module it imports"; the engine is untouched.
+- **Checkout path:** `docs.config.js` passes the checkout path resolved against the config file's folder (`import.meta.dirname`), the same way the engine resolves `contentDir`. Otherwise the default `../../rocketh` would depend on the current directory.
+- **Marker parsing** mirrors rocketh's `scripts/playground-examples.ts`: the marker is any whitespace-separated word starting `playground=`, with `<example>/<path>` and no empty, `.`, `..` or backslash parts. A malformed marker also fails the build with page and line, which the task did not specify. Error messages start with the marker and get the engine's "codeBlockAction threw:" prefix.
+- **"Every file" means every regular file**, recursively, with nothing skipped. The handler does not compare the fence body with the example file, because rocketh's own `pnpm test` already does that.
+- **Decoding:** `decodeOverlay` and the code it needs are copied into the tests only (`web/test/open-in-playground/decode-overlay.ts`), and decoded over an empty starting project. That way the result is exactly the example's files plus `select`.
+- **E2E test:** it finds the first marked fence in the checkout's pages and decodes the link on the built page against that example's files. It asserts that a marked sample exists, like the existing `::: danger` test, rather than skipping.
+- **Dependency:** `fflate` is pinned exactly to `0.8.3` and added under `devDependencies`, where every other dependency of this static site is.
+- **README:** besides the new row for the handler, the e2e row now mentions the link.
