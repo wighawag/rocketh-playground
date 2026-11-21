@@ -1,0 +1,71 @@
+---
+title: 'An example opens without the starting project''s Counter, and Download writes only what the tab held'
+slug: bare-starting-project
+---
+
+> Launch snapshot: records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) and the code; remaining work: `work/tasks/ready/` tasks. (The technical-detail sections below are trimmed by `to-task` once the work is tasked: they move into tasks or ADRs, and this spec settles to its durable framing of Problem, Solution, User Stories and Out of Scope.)
+
+This follows spec `open-in-playground` (`work/specs/tasked/open-in-playground.md`), which made an "Open in playground" link on rocketh.dev open an example as files over the playground's starting project. It spans the same three repositories: this one (the link's encoding, opening, Download), rocketh (the examples and their deploy check) and rocketh-website (the site that writes the links). It lives here because the encoding does.
+
+**Tasked 2026-11-21.** On this board: `project-link-bare-base`, and `rocketh-website-bare-base`, built in rocketh-website, which has no `work/` board. On rocketh's board, staged in `work/tasks/backlog/`: `playground-examples-bare-base`.
+
+## Problem Statement
+
+An example opened from rocketh.dev arrives on top of the whole starting project, so the starting project's sample comes with it. The reader who opened `GreetingsRegistry` from `documentation/deploy-scripts/` sees `contracts/Counter.sol` and `deploy/01_deploy_counter.ts` beside the sample's `deploy/001_deploy_greetings_registry.ts`, and pressing Deploy also deploys a `Counter` the page never mentions, reported after their own script. Every one of the 14 examples under rocketh's `examples/playground/` does this today; none of them uses `Counter`.
+
+A second, quieter problem sits under it. Download writes every file of the template with the project's files over them (`exportedProject` in `project/export-project.ts`), so a starting file the project does not hold comes back anyway. A tab project can lack `contracts/Counter.sol` today only through a hand-made `1.` link, but once examples open without it, every downloaded example would put `Counter` back, and its deploy script would run on `pnpm hardhat deploy`: what installs would no longer be what ran.
+
+## What the code holds today
+
+Checked on rocketh-playground `origin/main` at `57a6ecf`, rocketh at `a490706f` and rocketh-website at `3276f4c` (2026-11-21):
+
+- The tab's project is the four `STARTING_PROJECT_PATHS` (`project/template.ts`): `contracts/Counter.sol`, `deploy/01_deploy_counter.ts`, `rocketh/config.ts`, `rocketh/deploy.ts`. The template's other files (`hardhat.config.ts`, `package.json`, `contracts/Counter.t.sol`, `test/Counter.ts` and the rest of `web/project-template/`) exist only in the export.
+- A `2.` link is decoded by `decodeOverlay` (`project/share-link.ts`) as the starting project with the link's files over it, and any key other than `files` and `select` is refused. A playground that predates a new key therefore refuses links carrying it, so the playground must ship first.
+- Download drops the template's Counter tests (`COUNTER_TESTS`, `contracts/Counter.t.sol` and `test/Counter.ts`) only when `contracts/Counter.sol` is present and changed, and says so in the README preamble (`readmePreamble`).
+- Nothing in the UI adds or deletes a file; `session.open()` already removes from the language service the files a new project lacks.
+- rocketh's deploy check (`scripts/test-playground-examples.sh`) copies the published `hardhat-deploy init` project and writes each example over it with `cp -R`, so it deploys `Counter` with every example, as the tab does. `examples/playground/README.md` states "The starting project's own files stay". rocketh's `documentation/deploy-scripts/` paragraph about the button says the playground opens its starting project "with the sample's script and the contracts it needs written over it".
+- rocketh-website's handler (`web/open-in-playground/code-block-action.js`) calls `encodeOverlay(files, path)`; its encoder is a copy held to this repository's shared vector, `web/test/lib/playground/overlay-link-vector.json`.
+
+## Solution
+
+A `2.` link can name its base. Besides the full starting project (the default, and what every existing link keeps opening), there is one other: **bare**, the starting project without its Counter sample. rocketh.dev's links all ask for bare, so an example opens as exactly its own files plus the starting project's `rocketh/config.ts` and `rocketh/deploy.ts` (or the example's own), and Deploy runs exactly the example's scripts. Download writes what the tab held: a starting file the project lacks is left out, and so are the template's Counter tests when the project has no `contracts/Counter.sol`. play.rocketh.dev opened on its own still shows the starting project with `Counter`, and Reset still returns to it.
+
+## User Stories
+
+1. As a reader who opens a sample from rocketh.dev, I want to see only the example's files (and the config it runs with), so that I am not left wondering what `Counter` has to do with the page.
+2. As that reader, I want Deploy to run only the example's scripts, so that the transcript and the deployments are the ones the page describes.
+3. As a reader who downloads an opened example, I want the project to hold the same files the tab held, so that `pnpm hardhat deploy` deploys what I saw deploy.
+4. As a first-time visitor to play.rocketh.dev, I want to keep starting from the template's `Counter`, so that there is something to run before I have written anything.
+5. As a holder of a link shared before this change, I want it to open exactly as it did, so that no link already out there changes meaning.
+6. As a documentation author, I want rocketh's deploy check to deploy each example on the same base the link opens, so that "it deploys in CI" still means "it deploys in the tab".
+7. As a maintainer of rocketh-website, I want the bare base to be one field of the link, defined by the playground, so that the site never has to name the template's file paths.
+
+## Implementation Decisions
+
+- **The base is an optional key of the `2.` payload**, `"base": "bare"`. Absent means the full starting project, so every link written so far keeps its meaning and no new version prefix is needed. Any other value, and any other unknown key, is still refused. With sorted keys the payload reads `{"base":"bare","files":{...},"select":...}`. A bare link with an empty `files` is accepted, as a `2.` link with empty `files` is today; rocketh.dev never writes one (every example has contracts), and what Deploy does on such a project is recorded by the build rather than decided here. A `base` that is a string other than `"bare"` marks a newer link; a `base` of any other type is a corrupted link. `encodeOverlay` throws on a `base` other than `undefined` or `'bare'`.
+- **The encoder takes the base as an option**: `encodeOverlay(files, select?, options?: {base?: 'bare'})`, writing `base` only when it is `'bare'` (`sortedJSON` already leaves out an `undefined` key). The existing shared test vector stays valid as it is (it has no `base`), and a second vector file, `web/test/lib/playground/overlay-link-bare-vector.json`, holds the same files with `base: "bare"` and its exact value.
+- **rocketh-website ports the change by hand.** Its encoder is `web/open-in-playground/overlay-link.js`, the playground's `overlay-link.ts` rewritten with JSDoc types (not a byte copy), and its tests carry a copy of the decoder, `web/test/open-in-playground/decode-overlay.ts`, with the same unknown-key refusal. Both gain `base`; both vectors are copied there and the encoder is held to both. The header of the playground's `overlay-link.ts`, which says rocketh-website keeps "a copy of THIS FILE, as it is", is corrected to say what that repository actually holds.
+- **What "bare" means is the playground's to define**, as `bareProject()` in `project/template.ts` beside `STARTING_PROJECT_PATHS`: the starting project without `contracts/Counter.sol` and `deploy/01_deploy_counter.ts`, which leaves `rocketh/config.ts` and `rocketh/deploy.ts`. It throws when either path is missing from the template, as `startingProject()` does (`template.ts`); a unit test calls it, so `pnpm verify`, and with it the release follower's pull request, fails on a template update that renamed or removed either file, rather than silently leaving `Counter` in. Its comment names the copy of the list in rocketh's deploy check, and that script's comment names this one, so a change to one is made in both.
+- **The decoder is given both bases**: `decodeLink(value, bases: {starting: ProjectFiles; bare: ProjectFiles})`, since which one applies is known only once the payload is read. `createLinkOpener` keeps `starting` for what counts as no project of the reader's own (today the same option also means "what a `2.` link's files go over") and gains `bare` (default `bareProject()`). So a bare link opens at once on a first visit and asks first over a reader's own project, as any link does. Opening otherwise goes through the existing path: `session.open()`, which already removes from the language service the files the new project lacks, the selected file, and the `project` key removed from the URL.
+- **A link this playground cannot read because it is newer keeps its key in the URL.** When a `2.` link is refused only for an unknown key or an unknown `base` value, the error says the link needs a newer playground and asks for a reload, and the `project` key stays in the URL, as it does when the playground fails to start. A returning visitor whose service worker first serves a cached older build then gets the link on the next load instead of losing it. Every other refusal (corrupted, refused paths, a `select` naming no file) removes the key as today.
+- **Download writes what the tab held.** `exportedProject` leaves out every `STARTING_PROJECT_PATHS` file the project does not hold, and the template's Counter tests (`contracts/Counter.t.sol`, `test/Counter.ts`, which expects a `Counter` deployment) when `contracts/Counter.sol` is changed, as today, or when either Counter file is absent. The README preamble says which template files were left out and why. This applies to any project without those files, a bare link or a hand-made `1.` link alike. A project that holds them, unchanged or with only other edits, downloads byte for byte as before.
+- **The playground's documentation follows**: `web/src/lib/playground/README.md`'s `2.` bullet (the keys a payload may hold, what an empty `files` opens), its Opening a link bullet (which base a `2.` link opens over; a link refused for being newer keeps its key), its export-installs bullet (the bare case), its Download bullet (every template file with the reader's over them, the tests dropped only once Counter changed), the vector's `about` text, and the `share-link.ts` and `overlay-link.ts` headers.
+- **Every rocketh.dev example opens bare.** rocketh-website writes `base: "bare"` on every link; there is no per-example choice. An example that wanted `Counter` would carry its own copy of the files.
+- **rocketh's deploy check uses the same base**: before writing an example over its copy of the published `hardhat-deploy init` project, it removes `contracts/Counter.sol`, `deploy/01_deploy_counter.ts`, `contracts/Counter.t.sol` and `test/Counter.ts`, failing if any of them is missing (a template change must be noticed, not absorbed). `examples/playground/README.md` and the `documentation/deploy-scripts/` paragraph say an example opens without the starting project's Counter sample.
+- **Order of landing**, so that the page, the link and the check never disagree:
+  1. The playground (its decoder must accept `base` before any link carries it). play.rocketh.dev deploys on merge.
+  2. rocketh-website, writing `base: "bare"` on every link. It is not live until rocketh's pin moves.
+  3. rocketh, in ONE pull request: the bare deploy check, `examples/playground/README.md`, the `documentation/deploy-scripts/` paragraph, and `ROCKETH_WEBSITE_REF` moved to the rocketh-website commit from step 2, saying what it was verified against. rocketh.dev deploys rocketh's content as soon as it lands, so splitting these would leave the page describing links the pinned site does not write yet, or the check testing a base the live links do not open. It is opened only once play.rocketh.dev has served step 1 for at least a day: the playground live today refuses `base` and drops the key from the URL, and a returning visitor's service worker serves a cached build on the first load, so the wait is what protects this rollout (the keep-the-key rule only helps links newer than step 1).
+
+## Testing Decisions
+
+- This repository: the encoder with and without `base` (round trip, both vectors reproduced exactly, an unknown `base` value refused); `bareProject()` against the template; a bare link opens with only the link's files plus `rocketh/config.ts` and `rocketh/deploy.ts`, the named file selected, `chain at block 0`, nothing run (e2e); a `1.` link and a `2.` link without `base` open exactly as before (existing e2e unchanged); a link refused for an unknown key keeps the key in the URL; Download of a project without `contracts/Counter.sol` and `deploy/01_deploy_counter.ts` leaves them and the Counter tests out and says so, and `pnpm test:export` installs and deploys such a project.
+- rocketh-website: its encoder reproduces both vectors; its test decoder accepts `base: "bare"`; a marked sample's link decodes to the example's files with `base: "bare"` (unit test and `web/e2e/tests/rocketh.e2e.ts`).
+- rocketh: the deploy check deploys every example on the bare base, and fails when one of the four removed files is missing from the template (shown in the task's final report, not committed).
+
+## Out of Scope
+
+- Adding or deleting files in the playground's UI.
+- More bases than these two, or a per-example choice of base on rocketh.dev.
+- Project flavours (hardhat-deploy, rocketh CLI with forge or solc): `work/notes/ideas/project-flavours.md`. A flavour is a different axis (the toolchain); a base is which of the flavour's starting files an opened project keeps.
+- Renaming examples' deploy scripts to match the template's numbering.
