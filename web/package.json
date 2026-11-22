@@ -13,7 +13,7 @@
 		"@rocketh/core": "0.26.1",
 		"@rocketh/deploy": "0.22.5",
 		"@rocketh/diamond": "0.20.5",
-		"@rocketh/playground": "0.2.0",
+		"@rocketh/playground": "0.2.1",
 		"@rocketh/proxy": "0.21.6",
 		"@rocketh/read-execute": "0.23.1",
 		"@rocketh/router": "0.20.5",

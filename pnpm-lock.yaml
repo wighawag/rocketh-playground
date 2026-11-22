@@ -51,8 +51,8 @@ importers:
         specifier: 0.20.5
         version: 0.20.5(typescript@6.0.3)
       '@rocketh/playground':
-        specifier: 0.2.0
-        version: 0.2.0(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)
+        specifier: 0.2.1
+        version: 0.2.1(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)
       '@rocketh/proxy':
         specifier: 0.21.6
         version: 0.21.6(typescript@6.0.3)
@@ -593,8 +593,8 @@ packages:
   '@rocketh/diamond@0.20.5':
     resolution: {integrity: sha512-xhtxqklZWGy3YdEqVCwFMPD/4jvouEVB5AjCHQQMgXDKNpd0lAYrZ3+oB4Mle5BUzztVFg/B3Kd/jNTxYtb72g==}
 
-  '@rocketh/playground@0.2.0':
-    resolution: {integrity: sha512-NW03Gb9889jH6VX/564M+xQF0y5qowrLKBCj5Va5SKNNHC4sEfTt5mqNOzlqSbVsPEvA3XNybcgou0urWrbJQg==}
+  '@rocketh/playground@0.2.1':
+    resolution: {integrity: sha512-XVnnGnxp236RCRXWi0n3MfbPLXu1yQfkykOrSt/va5/vi0dXb7WuhY4RfLrORzPjnGgvQzDKPMzrUjptqNbZIA==}
     peerDependencies:
       rocketh: ^0.26.4
 
@@ -1541,6 +1541,9 @@ packages:
   revm-wasm@0.3.1:
     resolution: {integrity: sha512-nUEcnoiojMSFhnGGdog3+VvJcnQZ5bbW3Shm8vycoj2E5gQlID0aSVT/Sj+DBxoWiVt2XYv4y6i2xLL2l177ow==}
 
+  revm-wasm@0.5.0:
+    resolution: {integrity: sha512-UXufrg/6Pl3nmjH3PpMc5eTnu9fCiFjbPko5W9pTu+Sykz42voW9Kol+QBofGtcQ0nnV0nNmTFPbt4Yr6SZRkg==}
+
   rocketh@0.26.4:
     resolution: {integrity: sha512-FwINPMy/Wigj40SMTt/hMnq1YbDlmR02qIdNpDSOk2VrADxzapu/Ef9LeWwaWdmTQ/mjlKnru7VwxD4DqGEacg==}
     engines: {node: '>=22.0.0'}
@@ -1897,6 +1900,14 @@ packages:
 
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
+
+  webevm@0.10.0:
+    resolution: {integrity: sha512-cVgakBFLidGQi4ORo/ORqnQ6AfGWm9g68rVTgYlJM21EnENeicuXvLTdNEtS5t1E8h6l9yaRcrCI3jArXsMZOg==}
+    peerDependencies:
+      comlink: ^4.4.2
+    peerDependenciesMeta:
+      comlink:
+        optional: true
 
   webevm@0.9.1:
     resolution: {integrity: sha512-esC4SHLultXQ8Mc4GVUbO/wmn8Nz+DKDgXACfI3ZpedeO+K0EKojbV5rPFaECxGQTBnKgdGA1Ao9Ul7sOqcGDQ==}
@@ -2413,7 +2424,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@rocketh/playground@0.2.0(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)':
+  '@rocketh/playground@0.2.1(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)':
     dependencies:
       '@rocketh/core': 0.26.1(typescript@6.0.3)
       '@rocketh/deploy': 0.22.5(typescript@6.0.3)
@@ -2424,7 +2435,7 @@ snapshots:
       eip-1193: 0.7.4
       rocketh: 0.26.4(typescript@6.0.3)
       viem: 2.58.0(typescript@6.0.3)
-      webevm: 0.9.1(comlink@4.4.2)
+      webevm: 0.10.0(comlink@4.4.2)
     transitivePeerDependencies:
       - bufferutil
       - comlink
@@ -3214,6 +3225,8 @@ snapshots:
 
   revm-wasm@0.3.1: {}
 
+  revm-wasm@0.5.0: {}
+
   rocketh@0.26.4(typescript@6.0.3):
     dependencies:
       '@eip-1193/jsonrpc-provider': 0.6.1
@@ -3560,6 +3573,25 @@ snapshots:
       - msw
 
   w3c-keyname@2.2.8: {}
+
+  webevm@0.10.0(comlink@4.4.2):
+    dependencies:
+      '@eip-1193/over-port': 0.2.1
+      '@ethereumjs/block': 10.1.3
+      '@ethereumjs/common': 10.1.3
+      '@ethereumjs/evm': 10.1.3
+      '@ethereumjs/mpt': 10.1.3
+      '@ethereumjs/rlp': 10.1.3
+      '@ethereumjs/statemanager': 10.1.3
+      '@ethereumjs/tx': 10.1.3
+      '@ethereumjs/util': 10.1.3
+      '@ethereumjs/vm': 10.1.3
+      '@noble/hashes': 2.4.0
+      revm-wasm: 0.5.0
+    optionalDependencies:
+      comlink: 4.4.2
+    transitivePeerDependencies:
+      - supports-color
 
   webevm@0.9.1(comlink@4.4.2):
     dependencies:
