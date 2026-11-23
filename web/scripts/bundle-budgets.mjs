@@ -69,7 +69,10 @@ export const BUDGETS = {
 		'@rocketh/deploy': m(313778, 107668, '2026-11-20'),
 		'@rocketh/proxy': m(1373297, 289272, '2026-11-20'),
 		'@rocketh/diamond': m(1308821, 246724, '2026-11-20'),
-		'@rocketh/router': m(454246, 133056, '2026-11-21'),
+		// Raised on 2026-11-23 (from 454,246 / 133,056) for @rocketh/router 0.21.0: it adds the
+		// Router (now the default) and InlineRouter contracts beside Router10X60, and imports all
+		// three artifacts. Loaded only by a deploy script that imports @rocketh/router.
+		'@rocketh/router': m(666984, 172515, '2026-11-23'),
 		'@rocketh/read-execute': m(153728, 47756, '2026-11-20'),
 		'@rocketh/viem': m(442611, 157405, '2026-11-20'),
 		'@rocketh/signer': m(383572, 141559, '2026-11-20'),
