@@ -68,12 +68,14 @@
 				class="flex w-full items-baseline justify-between gap-2 rounded px-2 py-0.5 text-left text-xs hover:bg-muted"
 				class:bg-muted={selectedContract === contract.name}
 				data-contract={contract.name}
-				title={contract.address}
 				onclick={() => oncontract(contract.name)}
 			>
-				<span class="truncate font-medium">{contract.name}</span>
-				<span class="shrink-0 font-mono text-muted-foreground"
-					>{truncateHex(contract.address)}</span
+				<span class="truncate font-medium" title={contract.name}
+					>{contract.name}</span
+				>
+				<span
+					class="shrink-0 font-mono text-muted-foreground"
+					title={contract.address}>{truncateHex(contract.address)}</span
 				>
 			</button>
 		</li>
