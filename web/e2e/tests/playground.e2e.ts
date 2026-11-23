@@ -488,6 +488,10 @@ test('the Contracts view reads and calls Counter, from the deployer or the admin
 		/^account 3 \(/,
 		/^account 4 \(/,
 	]);
+	// the sender's full address, to copy into a read
+	await expect(page.getByTestId('send-from-address')).toHaveText(
+		/^0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\s*$/,
+	);
 
 	await send(page, 'inc');
 	const mined = card(page, 'inc').getByTestId('call-transaction');
@@ -510,6 +514,9 @@ test('the Contracts view reads and calls Counter, from the deployer or the admin
 	await page
 		.getByTestId('send-from')
 		.selectOption({label: 'admin (0x7099...79C8)'});
+	await expect(page.getByTestId('send-from-address')).toHaveText(
+		/^0x70997970C51812dc3A010C7d01b50e0d17dc79C8\s*$/,
+	);
 	await send(page, 'inc');
 	await expect(card(page, 'inc').getByTestId('call-transaction')).toContainText(
 		'from admin',

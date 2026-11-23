@@ -5,7 +5,8 @@
 	is picked in the file list rather than with that page's select, and the list comes from the
 	deployment records ($lib/playground/contracts/records.ts), not from a generated deployments
 	file. The address is jolly-roger's $lib/core/ui/ethereum/Address.svelte, in full, with its copy
-	button. Loaded on demand by Playground.svelte, with viem's ABI and signing code.
+	button, and so is the selected sender's, so it can be pasted into a read. Loaded on demand by
+	Playground.svelte, with viem's ABI and signing code.
 -->
 <script lang="ts">
 	import * as Tabs from '$lib/shadcn/ui/tabs';
@@ -79,6 +80,18 @@
 						{/each}
 					</select>
 				</label>
+				{#if from}
+					<!-- The sender's full address with its copy button, so it can be pasted into a read
+					     (a mapping keyed by account, say) after a write from it. -->
+					<Address
+						value={from.address}
+						truncate={false}
+						size="xs"
+						mono
+						class="max-w-full pb-2 break-all text-muted-foreground"
+						data-testid="send-from-address"
+					/>
+				{/if}
 			</div>
 			<p class="text-xs text-muted-foreground">
 				Reads are calls on the chain in this tab. Writes are signed with a
