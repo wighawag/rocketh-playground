@@ -698,12 +698,9 @@ test('Reset, once confirmed, gives the starting project on a fresh chain with no
 	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
 	await expect(editor(page)).not.toContainText('args: [1],');
 	await expect(flagged).toHaveCount(0, {timeout: 30_000});
-	await page
-		.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`)
-		.click();
-	await expect(editor(page)).not.toContainText('constructor(uint start)');
 
-	// a reload opens what Reset saved
+	// a reload opens what Reset saved. Nothing is clicked before it: a click saves the selection
+	// without Reset's wait, so the reload could open whichever file that save left selected.
 	await page.reload();
 	await ready(page);
 	await expect(page.getByTestId('block')).toHaveText('chain at block 0');
@@ -712,6 +709,10 @@ test('Reset, once confirmed, gives the starting project on a fresh chain with no
 	);
 	await expect(editor(page)).toHaveAttribute('aria-label', DEPLOY);
 	await expect(editor(page)).not.toContainText('args: [1],');
+	await page
+		.locator(`[data-testid="project-files"] [data-path="${COUNTER}"]`)
+		.click();
+	await expect(editor(page)).not.toContainText('constructor(uint start)');
 	await deploy(page, /^1 transaction sent$/);
 	await expect(page.getByTestId('block')).toHaveText('chain at block 1');
 });
