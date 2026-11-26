@@ -51,11 +51,11 @@ importers:
         specifier: 0.20.5
         version: 0.20.5(typescript@6.0.3)
       '@rocketh/playground':
-        specifier: 0.2.1
-        version: 0.2.1(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)
+        specifier: 0.2.2
+        version: 0.2.2(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)
       '@rocketh/proxy':
-        specifier: 0.21.6
-        version: 0.21.6(typescript@6.0.3)
+        specifier: 0.22.0
+        version: 0.22.0(typescript@6.0.3)
       '@rocketh/read-execute':
         specifier: 0.23.1
         version: 0.23.1(typescript@6.0.3)
@@ -593,13 +593,13 @@ packages:
   '@rocketh/diamond@0.20.5':
     resolution: {integrity: sha512-xhtxqklZWGy3YdEqVCwFMPD/4jvouEVB5AjCHQQMgXDKNpd0lAYrZ3+oB4Mle5BUzztVFg/B3Kd/jNTxYtb72g==}
 
-  '@rocketh/playground@0.2.1':
-    resolution: {integrity: sha512-XVnnGnxp236RCRXWi0n3MfbPLXu1yQfkykOrSt/va5/vi0dXb7WuhY4RfLrORzPjnGgvQzDKPMzrUjptqNbZIA==}
+  '@rocketh/playground@0.2.2':
+    resolution: {integrity: sha512-6cutPrkN/UeYQw0yMXHDh/kJP2qFh55DsBlK85LD51Z6GyvqwAoRskhrZ5x58A2qyT3fC6OXKhooush6ESYbJw==}
     peerDependencies:
       rocketh: ^0.26.4
 
-  '@rocketh/proxy@0.21.6':
-    resolution: {integrity: sha512-6bpX5wJa4hOy6OPWiSzakPOnmMTFuqjdFDDdaWsMRxcyej1HS/sPdcgVDf5Kk19l2mk3XmqWTdKTFoi2ZZ+2MQ==}
+  '@rocketh/proxy@0.22.0':
+    resolution: {integrity: sha512-RarCwkwH0mFxhuvpVBfsCnOP4Iey85YvJ/cU9iFWM09a6zx0H3JHXFRIUQc08vw1Wvtxsf2TRFKOgAnem5aTBg==}
 
   '@rocketh/read-execute@0.23.1':
     resolution: {integrity: sha512-3PGg1R38hCkSLbMIFpaocgxaJX1QSwiopFUuAu7agfLGVtMwB9tExupKt7+uKftDThnHf2EnSxIZsCfUhKG2jA==}
@@ -2424,11 +2424,11 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@rocketh/playground@0.2.1(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)':
+  '@rocketh/playground@0.2.2(comlink@4.4.2)(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)':
     dependencies:
       '@rocketh/core': 0.26.1(typescript@6.0.3)
       '@rocketh/deploy': 0.22.5(typescript@6.0.3)
-      '@rocketh/proxy': 0.21.6(typescript@6.0.3)
+      '@rocketh/proxy': 0.22.0(typescript@6.0.3)
       '@rocketh/read-execute': 0.23.1(typescript@6.0.3)
       '@rocketh/signer': 0.20.4(typescript@6.0.3)
       '@rocketh/web': 0.19.34(rocketh@0.26.4(typescript@6.0.3))(typescript@6.0.3)
@@ -2445,7 +2445,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@rocketh/proxy@0.21.6(typescript@6.0.3)':
+  '@rocketh/proxy@0.22.0(typescript@6.0.3)':
     dependencies:
       '@rocketh/core': 0.26.1(typescript@6.0.3)
       '@rocketh/deploy': 0.22.5(typescript@6.0.3)
